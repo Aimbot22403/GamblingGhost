@@ -1,47 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ghosts Gambling</title>
   <script src="https://unpkg.com/vue@3"></script>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       background: #111;
-      color: #fff;
-      font-family: Arial, sans-serif;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
     }
     input, button, textarea, select {
-      border: none;
-      padding: 10px;
-      margin: 5px 0;
-      border-radius: 12px;
-      width: 100%;
       background: #222;
       color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 10px;
+      margin-top: 8px;
+      width: 100%;
     }
     button {
-      background: white;
-      color: black;
       cursor: pointer;
-      font-weight: bold;
-      transition: all 0.2s;
+      transition: background 0.2s ease;
     }
     button:hover {
-      background: #ccc;
+      background: #333;
+    }
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      padding: 20px;
     }
     .card {
       background: #1c1c1c;
       padding: 20px;
-      margin: 10px 0;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      transition: box-shadow 0.3s;
-    }
-    .card:hover {
-      box-shadow: 0 4px 14px rgba(255,255,255,0.05);
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      margin-bottom: 20px;
     }
     nav {
       background: #1a1a1a;
@@ -49,206 +48,280 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #333;
     }
-    nav .menu {
-      cursor: pointer;
-      font-size: 24px;
+    nav h1 { font-size: 20px; }
+    nav .menu { cursor: pointer; }
+    .tabs button {
+      margin-right: 10px;
+      padding: 10px 15px;
     }
-    .tab-button {
-      background: transparent;
-      border: 1px solid white;
-      margin: 5px;
-      padding: 10px 20px;
+    .chat {
+      height: 300px;
+      overflow-y: auto;
+      border-radius: 10px;
+      background: #181818;
+      padding: 10px;
+      margin-bottom: 10px;
     }
-    .tab-button.active {
-      background: white;
-      color: black;
+    .chat p {
+      margin: 4px 0;
     }
-    .flex {
-      display: flex;
-      gap: 20px;
+    .online-users {
+      max-height: 150px;
+      overflow-y: auto;
+      background: #181818;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
     }
-    .column {
-      flex-direction: column;
-    }
-    .center {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
+    .profile {
       text-align: center;
     }
-    .profile-pic {
+    .profile img {
       width: 100px;
       height: 100px;
       border-radius: 50%;
       object-fit: cover;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .cell {
-      background: #333;
-      border-radius: 12px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .cell:hover {
-      background: #555;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <div id="app">
-    <nav>
-      <h1>Ghosts Gambling</h1>
-      <div class="menu" @click="menuOpen = !menuOpen">☰</div>
-    </nav>
-
-    <div v-if="!token" class="container">
-      <div class="card">
-        <h2>Register</h2>
-        <input v-model="registerUsername" placeholder="Username">
-        <input v-model="registerPassword" type="password" placeholder="Password">
-        <button @click="register">Register</button>
-      </div>
-      <div class="card">
-        <h2>Login</h2>
-        <input v-model="loginUsername" placeholder="Username">
-        <input v-model="loginPassword" type="password" placeholder="Password">
-        <button @click="login">Login</button>
-      </div>
+<div id="app" class="container">
+  <nav>
+    <h1>Ghosts Gambling</h1>
+    <div class="menu" v-if="user" @click="menuOpen = !menuOpen">☰</div>
+    <div v-if="menuOpen && user" style="position:absolute; right:20px; top:50px; background:#1a1a1a; padding:10px; border-radius:10px;">
+      <button @click="tab = 'profile'">Profile</button>
+      <button @click="logout">Logout</button>
     </div>
+  </nav>
 
-    <div v-else class="container">
-      <div v-if="menuOpen" class="card">
-        <button class="tab-button" @click="tab = 'home'">Home</button>
-        <button class="tab-button" @click="tab = 'blackjack'">Blackjack</button>
-        <button class="tab-button" @click="tab = 'mines'">Mines</button>
-        <button class="tab-button" @click="tab = 'profile'">Profile</button>
-        <button class="tab-button" @click="logout">Logout</button>
-      </div>
-
-      <div v-if="tab === 'home'" class="card">
-        <h2>Welcome to Ghosts Gambling</h2>
-        <div class="center">
-          <img src="https://fakecrime.bio/images/ghostpfp.png" class="profile-pic">
-          <p>Developed by Ghost</p>
-          <a href="https://fakecrime.bio/GhostUD" target="_blank">fakecrime.bio/GhostUD</a>
-        </div>
-        <h3>Online Users</h3>
-        <div class="card" v-for="u in onlineUsers" :key="u.username">
-          {{ u.username }} - {{ u.coins }} coins
-        </div>
-        <h3>Chat</h3>
-        <div class="card" v-for="msg in messages" :key="msg._id">
-          <strong @click="openProfile(msg.username)" style="cursor:pointer">{{ msg.username }}</strong>
-          <small>({{ new Date(msg.timestamp).toLocaleTimeString() }})</small><br>
-          {{ msg.text }}
-        </div>
-        <textarea v-model="chatText" placeholder="Type a message..."></textarea>
-        <button @click="sendMessage">Send</button>
-      </div>
-
-      <div v-if="tab === 'profile'" class="card">
-        <h2>Your Profile</h2>
-        <input type="file" @change="uploadPic">
-        <textarea v-model="bio" placeholder="Your bio..."></textarea>
-        <button @click="saveProfile">Save</button>
-        <div v-if="selectedProfile">
-          <h3>{{ selectedProfile.username }}</h3>
-          <img :src="selectedProfile.pic" class="profile-pic">
-          <p>{{ selectedProfile.bio }}</p>
-        </div>
-      </div>
-
-      <div v-if="tab === 'blackjack'" class="card">
-        <h2>Blackjack</h2>
-        <input v-model.number="bjBet" type="number" placeholder="Bet amount">
-        <button @click="startBlackjack">Start Game</button>
-        <div v-if="bjState">
-          <p>Your Cards: {{ bjState.player.join(', ') }}</p>
-          <p>Dealer: {{ bjState.dealerShown }}</p>
-          <button @click="hitBlackjack">Hit</button>
-          <button @click="standBlackjack">Stand</button>
-        </div>
-        <p v-if="bjResult">Result: {{ bjResult }}</p>
-      </div>
-
-      <div v-if="tab === 'mines'" class="card">
-        <h2>Mines</h2>
-        <input v-model.number="minesBet" type="number" placeholder="Bet amount">
-        <select v-model.number="minesCount">
-          <option :value="3">3 Mines</option>
-          <option :value="5">5 Mines</option>
-          <option :value="8">8 Mines</option>
-          <option :value="10">10 Mines</option>
-        </select>
-        <button @click="startMines">Start</button>
-        <div class="grid">
-          <div class="cell" v-for="(cell, i) in 25" :key="i" @click="clickCell(i)">
-            {{ revealedCells[i] }}
-          </div>
-        </div>
-        <p v-if="minesResult">{{ minesResult }}</p>
-      </div>
-    </div>
+  <div v-if="!user" class="card">
+    <h2 v-if="authMode==='login'">Login</h2>
+    <h2 v-else>Register</h2>
+    <input v-model="auth.username" placeholder="Username" />
+    <input v-model="auth.password" type="password" placeholder="Password" />
+    <button @click="authMode==='login' ? login() : register()">
+      {{ authMode==='login' ? 'Login' : 'Register' }}
+    </button>
+    <p style="text-align:center; cursor:pointer;" @click="authMode = authMode==='login' ? 'register' : 'login'">
+      Switch to {{ authMode==='login' ? 'Register' : 'Login' }}
+    </p>
   </div>
 
-  <script>
-    const socket = io();
-    const app = Vue.createApp({
-      data() {
-        return {
-          registerUsername: '',
-          registerPassword: '',
-          loginUsername: '',
-          loginPassword: '',
-          chatText: '',
-          messages: [],
-          onlineUsers: [],
-          tab: 'home',
-          token: '',
-          menuOpen: false,
-          bio: '',
-          selectedProfile: null,
-          bjBet: 0,
-          bjState: null,
-          bjResult: '',
-          minesBet: 0,
-          minesCount: 3,
-          minesGameId: '',
-          revealedCells: [],
-          minesResult: ''
-        }
-      },
-      methods: {
-        async register() { /* backend call */ },
-        async login() { /* backend call */ },
-        async logout() { this.token = ''; },
-        async sendMessage() { /* backend call */ },
-        async openProfile(username) { /* backend call */ },
-        async saveProfile() { /* backend call */ },
-        async uploadPic(event) { /* backend call */ },
-        async startBlackjack() { /* backend call */ },
-        async hitBlackjack() { /* backend call */ },
-        async standBlackjack() { /* backend call */ },
-        async startMines() { /* backend call */ },
-        async clickCell(index) { /* backend call */ }
-      },
-      mounted() {
-        socket.on('chat', msg => this.messages.push(msg))
-        socket.on('users', users => this.onlineUsers = users)
+  <div v-else>
+    <div class="tabs card">
+      <button @click="tab='home'">Home</button>
+      <button @click="tab='blackjack'">Blackjack</button>
+      <button @click="tab='mines'">Mines</button>
+    </div>
+
+    <div v-if="tab === 'home'" class="card">
+      <h3>Welcome, {{ user.username }}</h3>
+      <p>Coins: {{ user.coins }}</p>
+
+      <div class="online-users">
+        <strong>Online Users:</strong>
+        <div v-for="u in onlineUsers">{{ u.username }} - {{ u.coins }}</div>
+      </div>
+
+      <div class="chat">
+        <div v-for="msg in chat">
+          <p><strong @click="viewProfile(msg.username)" style="cursor:pointer;">{{ msg.username }}</strong>: {{ msg.text }}</p>
+        </div>
+      </div>
+      <input v-model="message" @keyup.enter="sendMessage" placeholder="Type your message..." />
+    </div>
+
+    <div v-if="tab === 'profile'" class="card profile">
+      <h3>Your Profile</h3>
+      <img :src=\"profilePic || 'https://placehold.co/100x100'\" />
+      <input type=\"file\" @change=\"uploadPic\" />
+      <textarea v-model=\"bio\" placeholder=\"Your bio...\"></textarea>
+      <button @click=\"saveProfile\">Save</button>
+    </div>
+
+    <div v-if=\"viewedProfile\" class=\"card profile\">
+      <h3>{{ viewedProfile.username }}</h3>
+      <img :src=\"viewedProfile.profilePic || 'https://placehold.co/100x100'\" />
+      <p>{{ viewedProfile.bio }}</p>
+      <button @click=\"viewedProfile = null\">Close</button>
+    </div>
+
+    <div v-if=\"tab === 'blackjack'\" class=\"card\">
+      <h3>Blackjack</h3>
+      <input v-model.number=\"blackjackBet\" placeholder=\"Bet amount\" type=\"number\" />
+      <button @click=\"startBlackjack\">Start</button>
+      <div v-if=\"blackjackResult\">Result: {{ blackjackResult }}</div>
+    </div>
+
+    <div v-if=\"tab === 'mines'\" class=\"card\">
+      <h3>Mines</h3>
+      <input v-model.number=\"minesBet\" placeholder=\"Bet amount\" type=\"number\" />
+      <select v-model.number=\"mineCount\">
+        <option :value=\"3\">3 Mines</option>
+        <option :value=\"5\">5 Mines</option>
+        <option :value=\"8\">8 Mines</option>
+        <option :value=\"10\">10 Mines</option>
+      </select>
+      <button @click=\"startMines\">Start Game</button>
+      <div v-if=\"minesGrid.length\">
+        <div style=\"display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:10px;\">
+          <button v-for=\"(cell, i) in minesGrid\" @click=\"clickCell(i)\">
+            {{ cell.revealed ? (cell.mine ? '💣' : '✅') : '?' }}
+          </button>
+        </div>
+      </div>
+      <div v-if=\"minesResult\">Result: {{ minesResult }}</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const socket = io();
+const app = Vue.createApp({
+  data() {
+    return {
+      authMode: 'login',
+      auth: { username: '', password: '' },
+      user: null,
+      token: '',
+      menuOpen: false,
+      tab: 'home',
+      chat: [],
+      message: '',
+      onlineUsers: [],
+      profilePic: '',
+      bio: '',
+      viewedProfile: null,
+      blackjackBet: 0,
+      blackjackResult: '',
+      minesBet: 0,
+      mineCount: 3,
+      minesGrid: [],
+      minesResult: ''
+    };
+  },
+  methods: {
+    async login() {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.auth)
+      });
+      const data = await res.json();
+      if (data.token) {
+        this.token = data.token;
+        this.user = data.user;
+        socket.emit('login', this.user.username);
+        this.fetchChat();
+        this.fetchUsers();
       }
-    }).mount('#app')
-  </script>
+    },
+    async register() {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.auth)
+      });
+      const data = await res.json();
+      if (data.token) {
+        this.token = data.token;
+        this.user = data.user;
+        socket.emit('login', this.user.username);
+        this.fetchChat();
+        this.fetchUsers();
+      }
+    },
+    logout() {
+      this.user = null;
+      this.token = '';
+      this.tab = 'home';
+      this.chat = [];
+    },
+    async fetchChat() {
+      const res = await fetch('/api/chat');
+      const data = await res.json();
+      this.chat = data;
+    },
+    async fetchUsers() {
+      const res = await fetch('/api/online');
+      const data = await res.json();
+      this.onlineUsers = data;
+    },
+    sendMessage() {
+      if (this.message) {
+        socket.emit('chat', { username: this.user.username, text: this.message });
+        this.message = '';
+      }
+    },
+    viewProfile(username) {
+      fetch(`/api/user/${username}`).then(r => r.json()).then(p => this.viewedProfile = p);
+    },
+    uploadPic(e) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.profilePic = reader.result;
+      };
+      reader.readAsDataURL(e.target.files[0]);
+    },
+    async saveProfile() {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.token
+        },
+        body: JSON.stringify({ profilePic: this.profilePic, bio: this.bio })
+      });
+    },
+    async startBlackjack() {
+      const res = await fetch('/api/blackjack', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.token
+        },
+        body: JSON.stringify({ bet: this.blackjackBet })
+      });
+      const data = await res.json();
+      this.blackjackResult = data.result;
+      this.user.coins = data.coins;
+    },
+    async startMines() {
+      const res = await fetch('/api/mines/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.token
+        },
+        body: JSON.stringify({ bet: this.minesBet, mines: this.mineCount })
+      });
+      const data = await res.json();
+      this.minesGrid = data.grid;
+      this.user.coins = data.coins;
+    },
+    async clickCell(i) {
+      const res = await fetch('/api/mines/click', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.token
+        },
+        body: JSON.stringify({ index: i })
+      });
+      const data = await res.json();
+      this.minesGrid = data.grid;
+      this.minesResult = data.result;
+      this.user.coins = data.coins;
+    }
+  },
+  mounted() {
+    socket.on('chat', msg => this.chat.push(msg));
+  }
+});
+app.mount('#app');
+</script>
 </body>
 </html>
