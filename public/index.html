@@ -3,574 +3,71 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Ghosts Gambling</title>
+<title>Ghosts Gambling - Test</title>
 <style>
-  /* === DEIN DESIGN 1:1, abgerundete Ecken, schwarz-weiß === */
-  body {
-    margin: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #121212;
-    color: #eee;
-    user-select: none;
-  }
-  nav {
-    display: flex;
-    justify-content: space-between;
-    background: #222;
-    padding: 10px 20px;
-    border-bottom-left-radius: 15px;
-    border-bottom-right-radius: 15px;
-  }
-  nav .tabs {
-    display: flex;
-    gap: 15px;
-  }
-  nav .tab {
-    cursor: pointer;
-    padding: 8px 16px;
-    border-radius: 15px;
-    background: #333;
-    transition: background-color 0.3s ease;
-  }
-  nav .tab.active,
-  nav .tab:hover {
-    background: #555;
-  }
-  nav .menu {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-  }
-  nav .menu button {
-    background: #333;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 12px;
-    color: #eee;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  nav .menu button:hover {
-    background: #555;
-  }
-
-  /* === Hauptbereich === */
-  #container {
-    display: flex;
-    height: calc(100vh - 56px);
-  }
-
-  /* Chatbereich */
-  #chatPanel {
-    width: 280px;
-    background: #1a1a1a;
-    display: flex;
-    flex-direction: column;
-    border-top-right-radius: 15px;
-    padding: 10px;
-  }
-  #chatMessages {
-    flex-grow: 1;
-    overflow-y: auto;
-    border-radius: 10px;
-    background: #222;
-    padding: 10px;
-    margin-bottom: 10px;
-  }
-  #chatInputContainer {
-    display: flex;
-    gap: 8px;
-  }
-  #chatInput {
-    flex-grow: 1;
-    padding: 8px 12px;
-    border-radius: 15px;
-    border: none;
-    background: #333;
-    color: #eee;
-    font-size: 14px;
-  }
-  #chatSend {
-    background: #333;
-    border: none;
-    color: #eee;
-    padding: 8px 14px;
-    border-radius: 15px;
-    cursor: pointer;
-  }
-  #chatSend:hover {
-    background: #555;
-  }
-
-  /* Nutzerliste */
-  #userList {
-    margin-top: 10px;
-    background: #222;
-    border-radius: 12px;
-    padding: 10px;
-    font-size: 14px;
-    height: 140px;
-    overflow-y: auto;
-  }
-
-  /* Hauptcontent (Spiele, Home, etc.) */
-  #mainContent {
-    flex-grow: 1;
-    background: #181818;
-    padding: 30px;
-    overflow-y: auto;
-  }
-
-  /* Profilmodal */
-  #profileModal {
-    display: none;
-    position: fixed;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    background: #222;
-    padding: 25px 30px;
-    border-radius: 20px;
-    box-shadow: 0 0 20px #000;
-    width: 320px;
-    z-index: 100;
-  }
-  #profileModal.active {
-    display: flex;
-    flex-direction: column;
-  }
-  #profileModal img {
-    width: 90px;
-    height: 90px;
-    border-radius: 50%;
-    margin-bottom: 15px;
-    object-fit: cover;
-  }
-  #profileModal textarea, #profileModal input {
-    background: #333;
-    border: none;
-    color: #eee;
-    padding: 10px;
-    border-radius: 15px;
-    margin-bottom: 15px;
-    resize: vertical;
-  }
-  #profileModal button {
-    background: #333;
-    border: none;
-    color: #eee;
-    padding: 10px;
-    border-radius: 15px;
-    cursor: pointer;
-    margin-bottom: 8px;
-  }
-  #profileModal button:hover {
-    background: #555;
-  }
-
-  /* Authmodal */
-  #authModal {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 200;
-  }
-  #authModal .authBox {
-    background: #222;
-    padding: 30px 40px;
-    border-radius: 20px;
-    width: 320px;
-    box-shadow: 0 0 25px #000;
-  }
-  #authModal h2 {
-    margin: 0 0 20px 0;
-    color: #eee;
-    text-align: center;
-  }
-  #authModal input {
-    width: 100%;
-    padding: 10px 14px;
-    margin-bottom: 16px;
-    border-radius: 15px;
-    border: none;
-    background: #333;
-    color: #eee;
-    font-size: 14px;
-  }
-  #authModal button {
-    width: 100%;
-    padding: 12px 0;
-    border-radius: 15px;
-    border: none;
-    background: #333;
-    color: #eee;
-    cursor: pointer;
-    font-size: 16px;
-  }
-  #authModal button:hover {
-    background: #555;
-  }
-  #authModal .switchLink {
-    color: #bbb;
-    text-align: center;
-    margin-top: 12px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-  #authModal .error {
-    color: #ff5050;
-    min-height: 18px;
-    font-size: 13px;
-    margin-bottom: 10px;
-  }
+  body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  input, button { font-size: 16px; padding: 10px; margin: 5px 0; border-radius: 8px; border: none; }
+  input { width: 100%; max-width: 300px; }
+  button { cursor: pointer; background: #444; color: #eee; }
+  button:hover { background: #666; }
+  #message { margin-top: 10px; }
 </style>
 </head>
 <body>
+<h1>Register</h1>
+<input id="regUsername" placeholder="Username" />
+<input id="regPassword" type="password" placeholder="Password" />
+<button onclick="register()">Register</button>
 
-<!-- Auth Modal -->
-<div id="authModal">
-  <div class="authBox" id="loginBox">
-    <h2>Login</h2>
-    <div class="error" id="loginError"></div>
-    <input type="text" id="loginUsername" placeholder="Username" autocomplete="off" />
-    <input type="password" id="loginPassword" placeholder="Password" autocomplete="off" />
-    <button id="loginBtn">Login</button>
-    <div class="switchLink" id="showRegister">Don't have an account? Register</div>
-  </div>
-  <div class="authBox" id="registerBox" style="display:none;">
-    <h2>Register</h2>
-    <div class="error" id="registerError"></div>
-    <input type="text" id="registerUsername" placeholder="Username" autocomplete="off" />
-    <input type="password" id="registerPassword" placeholder="Password" autocomplete="off" />
-    <button id="registerBtn">Register</button>
-    <div class="switchLink" id="showLogin">Already have an account? Login</div>
-  </div>
-</div>
+<h1>Login</h1>
+<input id="loginUsername" placeholder="Username" />
+<input id="loginPassword" type="password" placeholder="Password" />
+<button onclick="login()">Login</button>
 
-<!-- Haupt-App -->
-<nav>
-  <div class="tabs">
-    <div class="tab active" data-tab="home">Home</div>
-    <div class="tab" data-tab="blackjack">Blackjack</div>
-    <div class="tab" data-tab="mines">Mines</div>
-  </div>
-  <div class="menu">
-    <button id="profileBtn">Profile</button>
-    <button id="logoutBtn">Logout</button>
-  </div>
-</nav>
-
-<div id="container">
-  <div id="chatPanel">
-    <div id="chatMessages"></div>
-    <div id="chatInputContainer">
-      <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off" />
-      <button id="chatSend">Send</button>
-    </div>
-    <div id="userList"></div>
-  </div>
-  <div id="mainContent">
-    <h1>Welcome to Ghosts Gambling</h1>
-    <p>Developed by Ghost.</p>
-  </div>
-</div>
-
-<!-- Profil Modal -->
-<div id="profileModal">
-  <img id="profileImage" src="https://placehold.co/90x90" alt="Profile Picture" />
-  <h3 id="profileUsername"></h3>
-  <textarea id="profileBio" placeholder="Your bio..."></textarea>
-  <input type="text" id="profilePicUrl" placeholder="Profile picture URL" />
-  <button id="saveProfileBtn">Save</button>
-  <button id="closeProfileBtn">Close</button>
-</div>
+<div id="message"></div>
 
 <script>
-(() => {
-  let currentUser = null
-  let authToken = null
+async function register() {
+  const username = document.getElementById('regUsername').value.trim();
+  const password = document.getElementById('regPassword').value.trim();
+  if (!username || !password) return showMessage('Please enter username and password.');
 
-  // Hilfsfunktion für API Calls mit JSON + Fehlerhandling
-  async function api(endpoint, method = 'GET', data = null) {
-    const opts = {
-      method,
-      headers: { 'Content-Type': 'application/json' }
-    }
-    if (data) opts.body = JSON.stringify(data)
-    try {
-      const res = await fetch(endpoint, opts)
-      const text = await res.text()
-      // Falls Antwort leer, leeres Objekt zurückgeben
-      if (!text) return {}
-      // Versuche JSON zu parsen, falls fehler -> Fehler werfen
-      let json
-      try {
-        json = JSON.parse(text)
-      } catch {
-        throw new Error('Invalid JSON from server')
-      }
-      if (!res.ok) throw new Error(json.message || 'Server error')
-      return json
-    } catch (e) {
-      throw e
-    }
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Registration failed');
+    showMessage('Registered successfully! You can now log in.');
+  } catch (e) {
+    showMessage('Error: ' + e.message);
   }
+}
 
-  // UI Elemente
-  const authModal = document.getElementById('authModal')
-  const loginBox = document.getElementById('loginBox')
-  const registerBox = document.getElementById('registerBox')
-  const loginError = document.getElementById('loginError')
-  const registerError = document.getElementById('registerError')
+async function login() {
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!username || !password) return showMessage('Please enter username and password.');
 
-  const loginUsername = document.getElementById('loginUsername')
-  const loginPassword = document.getElementById('loginPassword')
-  const loginBtn = document.getElementById('loginBtn')
-
-  const registerUsername = document.getElementById('registerUsername')
-  const registerPassword = document.getElementById('registerPassword')
-  const registerBtn = document.getElementById('registerBtn')
-
-  const showRegister = document.getElementById('showRegister')
-  const showLogin = document.getElementById('showLogin')
-
-  const tabs = document.querySelectorAll('.tab')
-  const mainContent = document.getElementById('mainContent')
-
-  const chatMessages = document.getElementById('chatMessages')
-  const chatInput = document.getElementById('chatInput')
-  const chatSend = document.getElementById('chatSend')
-  const userList = document.getElementById('userList')
-
-  const profileBtn = document.getElementById('profileBtn')
-  const logoutBtn = document.getElementById('logoutBtn')
-
-  const profileModal = document.getElementById('profileModal')
-  const profileImage = document.getElementById('profileImage')
-  const profileUsername = document.getElementById('profileUsername')
-  const profileBio = document.getElementById('profileBio')
-  const profilePicUrl = document.getElementById('profilePicUrl')
-  const saveProfileBtn = document.getElementById('saveProfileBtn')
-  const closeProfileBtn = document.getElementById('closeProfileBtn')
-
-  // Hilfsfunktion Tabs wechseln
-  function setActiveTab(name) {
-    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name))
-    if (name === 'home') {
-      mainContent.innerHTML = `<h1>Welcome to Ghosts Gambling</h1><p>Developed by Ghost.</p>`
-    } else if (name === 'blackjack') {
-      mainContent.innerHTML = `<h2>Blackjack - coming soon</h2>`
-    } else if (name === 'mines') {
-      mainContent.innerHTML = `<h2>Mines - coming soon</h2>`
-    }
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Login failed');
+    showMessage('Login successful! Token: ' + data.token);
+  } catch (e) {
+    showMessage('Error: ' + e.message);
   }
+}
 
-  // Login/Register Wechsel
-  showRegister.onclick = () => {
-    loginBox.style.display = 'none'
-    registerBox.style.display = 'block'
-    loginError.textContent = ''
-    registerError.textContent = ''
-  }
-  showLogin.onclick = () => {
-    registerBox.style.display = 'none'
-    loginBox.style.display = 'block'
-    loginError.textContent = ''
-    registerError.textContent = ''
-  }
-
-  // Login Funktion
-  loginBtn.onclick = async () => {
-    loginError.textContent = ''
-    const username = loginUsername.value.trim()
-    const password = loginPassword.value.trim()
-    if (!username || !password) {
-      loginError.textContent = 'Please fill in all fields'
-      return
-    }
-    try {
-      const res = await api('/login', 'POST', { username, password })
-      authToken = res.token
-      currentUser = res.user
-      loginUsername.value = ''
-      loginPassword.value = ''
-      authModal.style.display = 'none'
-      updateUIAfterLogin()
-      setActiveTab('home')
-    } catch (e) {
-      loginError.textContent = e.message
-    }
-  }
-
-  // Register Funktion
-  registerBtn.onclick = async () => {
-    registerError.textContent = ''
-    const username = registerUsername.value.trim()
-    const password = registerPassword.value.trim()
-    if (!username || !password) {
-      registerError.textContent = 'Please fill in all fields'
-      return
-    }
-    if (password.length < 4) {
-      registerError.textContent = 'Password must be at least 4 characters'
-      return
-    }
-    try {
-      const res = await api('/register', 'POST', { username, password })
-      alert('Registration successful. Please login.')
-      registerUsername.value = ''
-      registerPassword.value = ''
-      registerBox.style.display = 'none'
-      loginBox.style.display = 'block'
-    } catch (e) {
-      registerError.textContent = e.message
-    }
-  }
-
-  // UI nach Login anpassen
-  function updateUIAfterLogin() {
-    document.getElementById('container').style.display = 'flex'
-    profileBtn.style.display = 'inline-block'
-    logoutBtn.style.display = 'inline-block'
-    chatMessages.innerHTML = ''
-    userList.innerHTML = ''
-    chatInput.value = ''
-    loadOnlineUsers()
-    loadChatMessages()
-  }
-
-  // Logout
-  logoutBtn.onclick = () => {
-    authToken = null
-    currentUser = null
-    document.getElementById('container').style.display = 'none'
-    authModal.style.display = 'flex'
-  }
-
-  // Tabs click event
-  tabs.forEach(tab => {
-    tab.onclick = () => setActiveTab(tab.dataset.tab)
-  })
-
-  // Chat senden
-  chatSend.onclick = async () => {
-    const msg = chatInput.value.trim()
-    if (!msg) return
-    try {
-      await api('/chat/send', 'POST', { token: authToken, message: msg })
-      chatInput.value = ''
-      loadChatMessages()
-    } catch (e) {
-      alert('Failed to send message: ' + e.message)
-    }
-  }
-
-  // Chat Nachrichten laden (alle 2 Sekunden)
-  async function loadChatMessages() {
-    if (!authToken) return
-    try {
-      const res = await api(`/chat/messages?token=${encodeURIComponent(authToken)}`)
-      chatMessages.innerHTML = ''
-      for (const msg of res.messages || []) {
-        const div = document.createElement('div')
-        div.innerHTML = `<b>${escapeHtml(msg.username)}:</b> ${escapeHtml(msg.text)}`
-        chatMessages.appendChild(div)
-      }
-      chatMessages.scrollTop = chatMessages.scrollHeight
-    } catch (e) {
-      // Fehler ignorieren, evtl. Server offline
-    }
-  }
-
-  // Online User laden (alle 5 Sekunden)
-  async function loadOnlineUsers() {
-    if (!authToken) return
-    try {
-      const res = await api(`/users/online?token=${encodeURIComponent(authToken)}`)
-      userList.innerHTML = ''
-      for (const user of res.users || []) {
-        const div = document.createElement('div')
-        div.textContent = user.username
-        div.style.cursor = 'pointer'
-        div.onclick = () => openProfile(user.username)
-        userList.appendChild(div)
-      }
-    } catch (e) {
-      // Fehler ignorieren
-    }
-  }
-
-  // Profil Modal öffnen
-  async function openProfile(username) {
-    try {
-      const res = await api(`/profile?username=${encodeURIComponent(username)}&token=${encodeURIComponent(authToken)}`)
-      profileUsername.textContent = res.user.username
-      profileBio.value = res.user.bio || ''
-      profilePicUrl.value = res.user.pic || ''
-      profileImage.src = res.user.pic || 'https://placehold.co/90x90'
-      profileModal.classList.add('active')
-      // Nur eigenes Profil editierbar
-      if (res.user.username === currentUser.username) {
-        profileBio.disabled = false
-        profilePicUrl.disabled = false
-        saveProfileBtn.style.display = 'inline-block'
-      } else {
-        profileBio.disabled = true
-        profilePicUrl.disabled = true
-        saveProfileBtn.style.display = 'none'
-      }
-    } catch (e) {
-      alert('Failed to load profile: ' + e.message)
-    }
-  }
-
-  // Profil speichern
-  saveProfileBtn.onclick = async () => {
-    try {
-      const newBio = profileBio.value.trim()
-      const newPic = profilePicUrl.value.trim()
-      await api('/profile/update', 'POST', { token: authToken, bio: newBio, pic: newPic })
-      alert('Profile updated successfully')
-      currentUser.bio = newBio
-      currentUser.pic = newPic
-      profileModal.classList.remove('active')
-    } catch (e) {
-      alert('Failed to update profile: ' + e.message)
-    }
-  }
-
-  // Profil Modal schließen
-  closeProfileBtn.onclick = () => {
-    profileModal.classList.remove('active')
-  }
-
-  // HTML Escaping für Sicherheit
-  function escapeHtml(text) {
-    const map = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;',
-    }
-    return text.replace(/[&<>"']/g, m => map[m])
-  }
-
-  // Initial UI Setup
-  document.getElementById('container').style.display = 'none'
-  profileBtn.style.display = 'none'
-  logoutBtn.style.display = 'none'
-
-  // Polling Chat und Online User
-  setInterval(() => {
-    if (authToken) {
-      loadChatMessages()
-      loadOnlineUsers()
-    }
-  }, 2500)
-})();
+function showMessage(msg) {
+  document.getElementById('message').textContent = msg;
+}
 </script>
 </body>
 </html>
