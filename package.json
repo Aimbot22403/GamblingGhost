@@ -1,7 +1,7 @@
 {
   "name": "ghosts-gambling",
   "version": "1.0.0",
-  "description": "A full-stack gambling website by Ghost.",
+  "description": "A full-stack gambling website.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
