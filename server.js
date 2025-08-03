@@ -1,461 +1,448 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const cors = require('cors');
-const path = require('path');
+import express from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { MongoClient, ObjectId } from "mongodb";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 
-// --- SETUP ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
-
-// --- ENVIRONMENT VARIABLES & SECRETS ---
 const PORT = process.env.PORT || 3000;
-const MONGO_URI = process.env.MONGODB_URI;
-const JWT_SECRET = process.env.JWT_SECRET;
 
-// --- VALIDATE ENVIRONMENT VARIABLES ---
-if (!MONGO_URI || !JWT_SECRET) {
-    console.error("FATAL ERROR: MONGODB_URI and JWT_SECRET must be defined in environment variables.");
-    // process.exit(1); // Optional: falls du den Server komplett stoppen willst
-}
+// Hardcoded config
+const JWT_SECRET = "9dkslfn2_DJ83sldf@!dkaP83";
+const MONGO_URI =
+  "mongodb+srv://GlobalConnection:iNA6MVaimtgyr2rV@ghostsgambling.41ahktw.mongodb.net/?retryWrites=true&w=majority&appName=GhostsGambling";
+const DB_NAME = "GhostsGambling";
 
-// --- MIDDLEWARE ---
+// Middleware
+app.use(express.json({ limit: "10mb" })); // parse JSON bodies, allow big for profile pics
 app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
-  next();
+// Serve frontend file
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
-
-// --- DATABASE CONNECTION ---
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("MongoDB connected"))
-  .catch(e => console.error("MongoDB connection error:", e));
-
-// --- SCHEMAS ---
-const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password: { type: String, required: true },
-  coins: { type: Number, default: 10000 },
-  bio: { type: String, default: "No bio set." },
-  pfp: { type: String, default: "https://i.imgur.com/8bzvETr.png" },
-  online: { type: Boolean, default: false }
+// Connect to MongoDB
+const client = new MongoClient(MONGO_URI, {
+  useUnifiedTopology: true,
 });
-const messageSchema = new mongoose.Schema({
-    username: String,
-    message: String,
-    timestamp: { type: Date, default: Date.now }
-});
-const User = mongoose.model('User', userSchema);
-const Message = mongoose.model('Message', messageSchema);
+await client.connect();
+const db = client.db(DB_NAME);
+const Users = db.collection("users");
+const Messages = db.collection("messages");
+const Sessions = new Map(); // token => userId (in-memory)
 
-// --- IN-MEMORY GAME STATE ---
-const blackjackGames = new Map();
-const minesGames = new Map();
-
-// --- AUTH MIDDLEWARE ---
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'Access denied. No token provided.' });
+// Helper: auth middleware
+async function authMiddleware(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) return res.status(401).json({ error: "No token" });
+  const token = auth.split(" ")[1];
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const data = jwt.verify(token, JWT_SECRET);
+    const user = await Users.findOne({ _id: new ObjectId(data.id) });
+    if (!user) return res.status(401).json({ error: "User not found" });
+    req.user = user;
     next();
   } catch {
-    res.status(403).json({ message: 'Invalid token' });
+    res.status(401).json({ error: "Invalid token" });
   }
-};
-
-// --- API ROUTES ---
+}
 
 // Register
-app.post('/api/register', async (req, res) => {
+app.post("/api/register", async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ message: "Username and password are required." });
-    if (password.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters." });
-
-    const existingUser = await User.findOne({ username: username.toLowerCase() });
-    if (existingUser) return res.status(400).json({ message: "Username already taken." });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ username: username.toLowerCase(), password: hashedPassword });
-    await user.save();
-    res.status(201).json({ message: "User registered successfully." });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error during registration." });
+    if (!username || !password) return res.status(400).json({ error: "Missing fields" });
+    const exists = await Users.findOne({ username: username.toLowerCase() });
+    if (exists) return res.status(400).json({ error: "Username taken" });
+    const hash = await bcrypt.hash(password, 10);
+    const userDoc = {
+      username: username.toLowerCase(),
+      passwordHash: hash,
+      coins: 10000,
+      bio: "",
+      profilePic: "", // base64 string
+      online: false,
+      lastOnline: new Date(),
+    };
+    const result = await Users.insertOne(userDoc);
+    // create JWT
+    const token = jwt.sign({ id: result.insertedId.toString() }, JWT_SECRET);
+    Sessions.set(token, result.insertedId.toString());
+    res.json({ token, username: userDoc.username, coins: userDoc.coins });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
   }
 });
+
 // Login
-app.post('/api/login', async (req, res) => {
+app.post("/api/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username: username.toLowerCase() });
-    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-    const validPass = await bcrypt.compare(password, user.password);
-    if (!validPass) return res.status(401).json({ message: 'Invalid credentials' });
-
-    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ token });
-  } catch {
-    res.status(500).json({ message: "Server error during login." });
+    if (!username || !password) return res.status(400).json({ error: "Missing fields" });
+    const user = await Users.findOne({ username: username.toLowerCase() });
+    if (!user) return res.status(400).json({ error: "Invalid credentials" });
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) return res.status(400).json({ error: "Invalid credentials" });
+    // mark online
+    await Users.updateOne({ _id: user._id }, { $set: { online: true, lastOnline: new Date() } });
+    const token = jwt.sign({ id: user._id.toString() }, JWT_SECRET);
+    Sessions.set(token, user._id.toString());
+    res.json({ token, username: user.username, coins: user.coins });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// Get own profile
-app.get('/api/profile', authenticateToken, async (req, res) => {
-    try {
-        const user = await User.findById(req.user.id).select('-password -__v');
-        if (!user) return res.status(404).json({ message: "User not found." });
-        res.json(user);
-    } catch (error) {
-        console.error("Profile fetch error:", error);
-        res.status(500).json({ message: "Error fetching profile." });
+// Logout (client just forgets token, but mark offline server-side optionally)
+app.post("/api/logout", authMiddleware, async (req, res) => {
+  try {
+    await Users.updateOne({ _id: req.user._id }, { $set: { online: false, lastOnline: new Date() } });
+    // Remove token from sessions map
+    for (const [token, uid] of Sessions.entries()) {
+      if (uid === req.user._id.toString()) Sessions.delete(token);
     }
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-// Update profile (bio + pfp)
-app.post('/api/profile/update', authenticateToken, async (req, res) => {
-    try {
-        const { bio, pfp } = req.body;
-        await User.findByIdAndUpdate(req.user.id, { bio, pfp });
-        res.json({ message: 'Profile updated successfully.' });
-    } catch (error) {
-        console.error("Profile update error:", error);
-        res.status(500).json({ message: "Error updating profile." });
-    }
+// Get current user info
+app.get("/api/me", authMiddleware, async (req, res) => {
+  const u = req.user;
+  res.json({
+    username: u.username,
+    coins: u.coins,
+    bio: u.bio,
+    profilePic: u.profilePic,
+  });
 });
 
-// Get any user profile by username (public)
-app.get('/api/user/:username', async (req, res) => {
-    try {
-        const username = req.params.username.toLowerCase();
-        const user = await User.findOne({ username }).select('username bio pfp');
-        if (!user) return res.status(404).json({ message: "User not found." });
-        res.json(user);
-    } catch (error) {
-        console.error("User fetch error:", error);
-        res.status(500).json({ message: "Error fetching user." });
+// Update profile (bio + profilePic)
+app.post("/api/me/profile", authMiddleware, async (req, res) => {
+  try {
+    let { bio, profilePic } = req.body;
+    if (typeof bio !== "string" || typeof profilePic !== "string") {
+      return res.status(400).json({ error: "Invalid input" });
     }
+    if (bio.length > 200) bio = bio.slice(0, 200);
+    await Users.updateOne({ _id: req.user._id }, { $set: { bio, profilePic } });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-// --- GAME LOGIC ---
-
-// Hilfsfunktionen für Blackjack
-const getCardValue = c => {
-    if (['J', 'Q', 'K'].includes(c.value)) return 10;
-    if (c.value === 'A') return 11;
-    return parseInt(c.value);
-};
-const getHandValue = h => {
-    let total = h.reduce((sum, c) => sum + getCardValue(c), 0);
-    let aces = h.filter(c => c.value === 'A').length;
-    while (total > 21 && aces > 0) {
-        total -= 10;
-        aces--;
-    }
-    return total;
-};
-
-// Blackjack starten
-app.post('/api/blackjack/start', authenticateToken, async (req, res) => {
-    try {
-        const { bet } = req.body;
-        if (!bet || bet <= 0) return res.status(400).json({ message: "Invalid bet." });
-
-        const user = await User.findById(req.user.id);
-        if (!user) return res.status(404).json({ message: "User not found." });
-        if (blackjackGames.has(req.user.id)) return res.status(400).json({ message: "Finish your current game first." });
-        if (user.coins < bet) return res.status(400).json({ message: "Insufficient coins." });
-
-        user.coins -= bet;
-        await user.save();
-        broadcastOnlineUsers();
-
-        const suits = ['H', 'D', 'C', 'S'];
-        const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-        let deck = [];
-        for (const s of suits) {
-            for (const v of values) {
-                deck.push({ suit: s, value: v });
-            }
-        }
-        deck = deck.sort(() => 0.5 - Math.random());
-
-        const playerHand = [deck.pop(), deck.pop()];
-        const dealerHand = [deck.pop(), deck.pop()];
-        const gameState = { deck, playerHand, dealerHand, bet, status: 'playing' };
-        blackjackGames.set(req.user.id, gameState);
-
-        const playerVal = getHandValue(playerHand);
-        if (playerVal === 21) {
-            // Blackjack sofort Gewinn
-            const winnings = bet * 2.5;
-            user.coins += winnings;
-            await user.save();
-            blackjackGames.delete(req.user.id);
-            broadcastOnlineUsers();
-            return res.json({
-                status: `Blackjack! You win ${winnings} coins!`,
-                playerHand,
-                dealerHand,
-                playerValue: playerVal,
-                dealerValue: getHandValue(dealerHand),
-                newBalance: user.coins
-            });
-        }
-
-        res.json({
-            status: 'playing',
-            playerHand,
-            dealerHand: [dealerHand[0], { suit: '?', value: '?' }],
-            playerValue: playerVal,
-            newBalance: user.coins
-        });
-    } catch (error) {
-        console.error("Blackjack start error:", error);
-        res.status(500).json({ message: "Error starting Blackjack." });
-    }
-});
-
-// Blackjack Aktionen (hit, stand)
-app.post('/api/blackjack/action', authenticateToken, async (req, res) => {
-    try {
-        const { action } = req.body;
-        if (!action) return res.status(400).json({ message: "Action required." });
-
-        const game = blackjackGames.get(req.user.id);
-        if (!game) return res.status(404).json({ message: "No active Blackjack game." });
-
-        const user = await User.findById(req.user.id);
-        if (!user) return res.status(404).json({ message: "User not found." });
-
-        if (action === 'hit') {
-            game.playerHand.push(game.deck.pop());
-            const playerValue = getHandValue(game.playerHand);
-            if (playerValue > 21) {
-                game.status = 'bust';
-                blackjackGames.delete(req.user.id);
-                broadcastOnlineUsers();
-                return res.json({
-                    status: `Bust! You lost ${game.bet} coins.`,
-                    playerHand: game.playerHand,
-                    dealerHand: game.dealerHand,
-                    playerValue,
-                    dealerValue: getHandValue(game.dealerHand),
-                    newBalance: user.coins
-                });
-            }
-            blackjackGames.set(req.user.id, game);
-            return res.json({
-                status: 'playing',
-                playerHand: game.playerHand,
-                dealerHand: [game.dealerHand[0], { suit: '?', value: '?' }],
-                playerValue
-            });
-        }
-
-        if (action === 'stand') {
-            while (getHandValue(game.dealerHand) < 17) {
-                game.dealerHand.push(game.deck.pop());
-            }
-            const dealerValue = getHandValue(game.dealerHand);
-            const playerValue = getHandValue(game.playerHand);
-            let msg = '';
-            let winnings = 0;
-
-            if (dealerValue > 21 || playerValue > dealerValue) {
-                winnings = game.bet * 2;
-                msg = `You win ${winnings} coins!`;
-                user.coins += winnings;
-            } else if (playerValue < dealerValue) {
-                msg = `Dealer wins. You lost ${game.bet} coins.`;
-            } else {
-                winnings = game.bet;
-                msg = `Push. Your bet of ${winnings} coins was returned.`;
-                user.coins += winnings;
-            }
-            await user.save();
-            blackjackGames.delete(req.user.id);
-            broadcastOnlineUsers();
-            return res.json({
-                status: msg,
-                playerHand: game.playerHand,
-                dealerHand: game.dealerHand,
-                playerValue,
-                dealerValue,
-                newBalance: user.coins
-            });
-        }
-
-        res.status(400).json({ message: "Invalid action." });
-    } catch (error) {
-        console.error("Blackjack action error:", error);
-        res.status(500).json({ message: "Error during Blackjack action." });
-    }
-});
-
-// Mines starten
-app.post('/api/mines/start', authenticateToken, async (req, res) => {
-    try {
-        const { bet, minesCount } = req.body;
-        if (!bet || bet <= 0) return res.status(400).json({ message: "Invalid bet." });
-        if (![3, 5, 8, 10].includes(minesCount)) return res.status(400).json({ message: "Invalid mine count." });
-
-        const user = await User.findById(req.user.id);
-        if (!user) return res.status(404).json({ message: "User not found." });
-        if (minesGames.has(req.user.id)) return res.status(400).json({ message: "Finish your current Mines game." });
-        if (user.coins < bet) return res.status(400).json({ message: "Insufficient coins." });
-
-        user.coins -= bet;
-        await user.save();
-        broadcastOnlineUsers();
-
-        const mines = new Set();
-        while (mines.size < minesCount) {
-            mines.add(Math.floor(Math.random() * 25)); // 25 Felder
-        }
-
-        minesGames.set(req.user.id, {
-            bet,
-            mines: Array.from(mines),
-            clicks: 0,
-            mult: { 3: 1.15, 5: 1.3, 8: 1.5, 10: 1.8 }[minesCount]
-        });
-
-        res.json({ message: "Game started", newBalance: user.coins });
-    } catch (error) {
-        console.error("Mines start error:", error);
-        res.status(500).json({ message: "Error starting Mines game." });
-    }
-});
-
-// Mines Feld klicken
-app.post('/api/mines/click', authenticateToken, async (req, res) => {
-    try {
-        const { index } = req.body;
-        const game = minesGames.get(req.user.id);
-        if (!game) return res.status(404).json({ message: "No active Mines game." });
-
-        if (game.mines.includes(index)) {
-            minesGames.delete(req.user.id);
-            return res.json({
-                gameOver: true,
-                message: `Boom! You hit a mine and lost ${game.bet} coins.`,
-                minePositions: game.mines
-            });
-        }
-
-        game.clicks++;
-        const profit = game.bet * Math.pow(game.mult, game.clicks) - game.bet;
-        minesGames.set(req.user.id, game);
-        return res.json({
-            gameOver: false,
-            revealedIndex: index,
-            profit: Math.floor(profit),
-            nextMultiplier: Math.pow(game.mult, game.clicks + 1)
-        });
-    } catch (error) {
-        console.error("Mines click error:", error);
-        res.status(500).json({ message: "Error during Mines click." });
-    }
-});
-
-// Mines auscashen
-app.post('/api/mines/cashout', authenticateToken, async (req, res) => {
-    try {
-        const game = minesGames.get(req.user.id);
-        if (!game || game.clicks === 0) return res.status(400).json({ message: "No game or clicks to cash out." });
-
-        const winnings = Math.floor(game.bet * Math.pow(game.mult, game.clicks));
-        const user = await User.findById(req.user.id);
-        user.coins += winnings;
-        await user.save();
-
-        minesGames.delete(req.user.id);
-        broadcastOnlineUsers();
-
-        res.json({ message: `Cashed out ${winnings} coins!`, newBalance: user.coins });
-    } catch (error) {
-        console.error("Mines cashout error:", error);
-        res.status(500).json({ message: "Error during Mines cashout." });
-    }
-});
-
-// --- CATCH-ALL ROUTE ---
-// Serve Frontend (React / Vue oder statische index.html)
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// --- WEBSOCKET LOGIC ---
-io.on('connection', (socket) => {
-    socket.on('authenticate', async (token) => {
-        try {
-            const decoded = jwt.verify(token, JWT_SECRET);
-            const user = await User.findById(decoded.id);
-            if (!user) throw new Error("User not found");
-            await User.findByIdAndUpdate(user._id, { online: true });
-            socket.userId = user._id.toString();
-            socket.username = user.username;
-            broadcastOnlineUsers();
-            const lastMessages = await Message.find().sort({ timestamp: -1 }).limit(50);
-            socket.emit('chat_history', lastMessages.reverse());
-        } catch (err) {
-            socket.disconnect();
-        }
+// Get profile by username (for chat clicks)
+app.get("/api/user/:username", async (req, res) => {
+  try {
+    const username = req.params.username.toLowerCase();
+    const user = await Users.findOne({ username });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({
+      username: user.username,
+      bio: user.bio,
+      profilePic: user.profilePic,
     });
-
-    socket.on('chat_message', async (msg) => {
-        if (socket.username && msg) {
-            try {
-                const newMessage = new Message({ username: socket.username, message: msg });
-                await newMessage.save();
-                io.emit('chat_message', newMessage);
-            } catch (e) {
-                console.error("Error saving chat message:", e);
-            }
-        }
-    });
-
-    socket.on('disconnect', async () => {
-        if (socket.userId) {
-            try {
-                await User.findByIdAndUpdate(socket.userId, { online: false });
-                broadcastOnlineUsers();
-                blackjackGames.delete(socket.userId);
-                minesGames.delete(socket.userId);
-            } catch (e) {
-                console.error("Error during socket disconnect cleanup:", e);
-            }
-        }
-    });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-// Broadcast online users an alle Clients
-async function broadcastOnlineUsers() {
-    try {
-        const onlineUsers = await User.find({ online: true }).select('username coins');
-        io.emit('online_users', onlineUsers);
-    } catch (e) {
-        console.error("Error broadcasting online users:", e);
-    }
+// Get online users list (username + coins)
+app.get("/api/online-users", async (req, res) => {
+  try {
+    const onlineUsers = await Users.find({ online: true }).project({ username: 1, coins: 1 }).toArray();
+    res.json(onlineUsers);
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- CHAT ---
+
+// Post a chat message
+app.post("/api/chat", authMiddleware, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || text.length > 500) return res.status(400).json({ error: "Invalid message" });
+    const message = {
+      userId: req.user._id,
+      username: req.user.username,
+      text: text.trim(),
+      timestamp: new Date(),
+    };
+    await Messages.insertOne(message);
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get last 100 messages
+app.get("/api/chat", async (req, res) => {
+  try {
+    const msgs = await Messages.find({})
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .toArray();
+    // reverse for oldest first
+    res.json(msgs.reverse());
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- GAMES ---
+
+// Blackjack game states are ephemeral - stored per user in memory (reset on server restart)
+const blackjackGames = new Map();
+
+// Helper for cards
+const suits = ["♠", "♥", "♦", "♣"];
+const values = [
+  "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K",
+];
+
+function createDeck() {
+  const deck = [];
+  for (const s of suits) {
+    for (const v of values) deck.push({ suit: s, value: v });
+  }
+  return deck.sort(() => Math.random() - 0.5); // shuffle
 }
-setInterval(broadcastOnlineUsers, 5000);
+function cardValue(card) {
+  if (card.value === "A") return 11;
+  if (["J", "Q", "K"].includes(card.value)) return 10;
+  return Number(card.value);
+}
+function handValue(hand) {
+  let val = 0, aces = 0;
+  for (const c of hand) {
+    val += cardValue(c);
+    if (c.value === "A") aces++;
+  }
+  while (val > 21 && aces > 0) {
+    val -= 10;
+    aces--;
+  }
+  return val;
+}
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
+// Start blackjack
+app.post("/api/blackjack/start", authMiddleware, async (req, res) => {
+  try {
+    let { bet } = req.body;
+    bet = Number(bet);
+    if (!bet || bet < 10 || bet > req.user.coins) return res.status(400).json({ error: "Invalid bet" });
+
+    // Create deck and hands
+    const deck = createDeck();
+    const playerHand = [deck.pop(), deck.pop()];
+    const dealerHand = [deck.pop(), deck.pop()];
+    const playerVal = handValue(playerHand);
+    const dealerVal = handValue(dealerHand);
+
+    // Save game state
+    blackjackGames.set(req.user._id.toString(), {
+      deck,
+      playerHand,
+      dealerHand,
+      bet,
+      done: false,
+      playerStood: false,
+    });
+
+    res.json({
+      playerHand,
+      dealerHand: [dealerHand[0], { suit: "?", value: "?" }],
+      playerVal,
+      bet,
+    });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-// --- SERVER START ---
-server.listen(PORT, () => {
-    console.log(`Ghosts Gambling server running on port ${PORT}`);
+// Player hits
+app.post("/api/blackjack/hit", authMiddleware, async (req, res) => {
+  try {
+    const game = blackjackGames.get(req.user._id.toString());
+    if (!game || game.done) return res.status(400).json({ error: "No active game" });
+
+    game.playerHand.push(game.deck.pop());
+    const playerVal = handValue(game.playerHand);
+    if (playerVal > 21) {
+      // Player busts - lose bet
+      game.done = true;
+      await Users.updateOne({ _id: req.user._id }, { $inc: { coins: -game.bet } });
+      blackjackGames.delete(req.user._id.toString());
+      return res.json({ status: "bust", playerHand: game.playerHand, playerVal, bet: game.bet, coins: req.user.coins - game.bet });
+    }
+    res.json({ status: "playing", playerHand: game.playerHand, playerVal });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Player stands, dealer plays
+app.post("/api/blackjack/stand", authMiddleware, async (req, res) => {
+  try {
+    const game = blackjackGames.get(req.user._id.toString());
+    if (!game || game.done) return res.status(400).json({ error: "No active game" });
+
+    game.playerStood = true;
+
+    // Dealer reveals cards and draws until 17+
+    while (handValue(game.dealerHand) < 17) {
+      game.dealerHand.push(game.deck.pop());
+    }
+    const playerVal = handValue(game.playerHand);
+    const dealerVal = handValue(game.dealerHand);
+
+    let result = "lose";
+    let coinsChange = -game.bet;
+    if (playerVal > 21) {
+      result = "lose";
+    } else if (dealerVal > 21 || playerVal > dealerVal) {
+      result = "win";
+      coinsChange = game.bet;
+    } else if (playerVal === dealerVal) {
+      result = "draw";
+      coinsChange = 0;
+    }
+    // Update coins if not draw
+    if (coinsChange !== 0) {
+      await Users.updateOne({ _id: req.user._id }, { $inc: { coins: coinsChange } });
+    }
+    // Remove game state
+    blackjackGames.delete(req.user._id.toString());
+    const userAfter = await Users.findOne({ _id: req.user._id });
+
+    res.json({
+      result,
+      playerHand: game.playerHand,
+      dealerHand: game.dealerHand,
+      playerVal,
+      dealerVal,
+      coins: userAfter.coins,
+      bet: game.bet,
+    });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- MINES ---
+
+// Mines games ephemeral storage per user
+const minesGames = new Map();
+
+// Get multiplier by mines count
+function getMultiplier(mines) {
+  switch (mines) {
+    case 3: return 1.3;
+    case 5: return 1.8;
+    case 8: return 3.5;
+    case 10: return 5.5;
+    default: return 1;
+  }
+}
+
+// Start mines
+app.post("/api/mines/start", authMiddleware, async (req, res) => {
+  try {
+    let { bet, mines } = req.body;
+    bet = Number(bet);
+    mines = Number(mines);
+    if (!bet || bet < 10 || bet > req.user.coins) return res.status(400).json({ error: "Invalid bet" });
+    if (![3, 5, 8, 10].includes(mines)) return res.status(400).json({ error: "Invalid mines count" });
+
+    const gridSize = 25; // 5x5 grid
+    const minePositions = new Set();
+    while (minePositions.size < mines) {
+      minePositions.add(Math.floor(Math.random() * gridSize));
+    }
+    minesGames.set(req.user._id.toString(), {
+      bet,
+      mines,
+      minePositions,
+      revealed: new Set(),
+      finished: false,
+      multiplier: getMultiplier(mines),
+    });
+    res.json({ ok: true, gridSize, mines });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Reveal a cell
+app.post("/api/mines/reveal", authMiddleware, async (req, res) => {
+  try {
+    const { index } = req.body;
+    if (typeof index !== "number") return res.status(400).json({ error: "Invalid index" });
+    const game = minesGames.get(req.user._id.toString());
+    if (!game || game.finished) return res.status(400).json({ error: "No active game" });
+    if (game.revealed.has(index)) return res.status(400).json({ error: "Cell already revealed" });
+    game.revealed.add(index);
+    if (game.minePositions.has(index)) {
+      // Player hit a mine - lose bet
+      game.finished = true;
+      await Users.updateOne({ _id: req.user._id }, { $inc: { coins: -game.bet } });
+      minesGames.delete(req.user._id.toString());
+      const userAfter = await Users.findOne({ _id: req.user._id });
+      return res.json({ status: "lose", coins: userAfter.coins, hitMine: true });
+    }
+    // Player safe
+    // Calculate current win coins: bet * multiplier * (safeCellsRevealed / total safe cells)
+    const safeCells = 25 - game.mines;
+    const safeRevealed = game.revealed.size;
+    const partialMultiplier = 1 + ((game.multiplier - 1) * safeRevealed) / safeCells;
+
+    res.json({ status: "safe", partialMultiplier, revealedCount: safeRevealed });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Cash out mines game (player takes current multiplier * bet)
+app.post("/api/mines/cashout", authMiddleware, async (req, res) => {
+  try {
+    const game = minesGames.get(req.user._id.toString());
+    if (!game || game.finished) return res.status(400).json({ error: "No active game" });
+
+    const safeCells = 25 - game.mines;
+    const safeRevealed = game.revealed.size;
+    if (safeRevealed === 0) return res.status(400).json({ error: "No cells revealed yet" });
+
+    const finalMultiplier = 1 + ((game.multiplier - 1) * safeRevealed) / safeCells;
+    const winAmount = Math.floor(game.bet * finalMultiplier);
+
+    // Add coins won
+    await Users.updateOne({ _id: req.user._id }, { $inc: { coins: winAmount } });
+    game.finished = true;
+    minesGames.delete(req.user._id.toString());
+    const userAfter = await Users.findOne({ _id: req.user._id });
+    res.json({ status: "win", coins: userAfter.coins, winAmount, finalMultiplier });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Static files fallback - serve index.html for all other routes (SPA)
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Ghosts Gambling server listening on port ${PORT}`);
 });

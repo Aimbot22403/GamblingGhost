@@ -1,73 +1,254 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Ghosts Gambling - Test</title>
-<style>
-  body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
-  input, button { font-size: 16px; padding: 10px; margin: 5px 0; border-radius: 8px; border: none; }
-  input { width: 100%; max-width: 300px; }
-  button { cursor: pointer; background: #444; color: #eee; }
-  button:hover { background: #666; }
-  #message { margin-top: 10px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghosts Gambling</title>
+  <script src="https://unpkg.com/vue@3"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+    input, button, textarea, select {
+      border: none;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 12px;
+      width: 100%;
+      background: #222;
+      color: white;
+    }
+    button {
+      background: white;
+      color: black;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #ccc;
+    }
+    .card {
+      background: #1c1c1c;
+      padding: 20px;
+      margin: 10px 0;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: box-shadow 0.3s;
+    }
+    .card:hover {
+      box-shadow: 0 4px 14px rgba(255,255,255,0.05);
+    }
+    nav {
+      background: #1a1a1a;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+    nav .menu {
+      cursor: pointer;
+      font-size: 24px;
+    }
+    .tab-button {
+      background: transparent;
+      border: 1px solid white;
+      margin: 5px;
+      padding: 10px 20px;
+    }
+    .tab-button.active {
+      background: white;
+      color: black;
+    }
+    .flex {
+      display: flex;
+      gap: 20px;
+    }
+    .column {
+      flex-direction: column;
+    }
+    .center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+    }
+    .profile-pic {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .cell {
+      background: #333;
+      border-radius: 12px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .cell:hover {
+      background: #555;
+    }
+  </style>
 </head>
 <body>
-<h1>Register</h1>
-<input id="regUsername" placeholder="Username" />
-<input id="regPassword" type="password" placeholder="Password" />
-<button onclick="register()">Register</button>
+  <div id="app">
+    <nav>
+      <h1>Ghosts Gambling</h1>
+      <div class="menu" @click="menuOpen = !menuOpen">☰</div>
+    </nav>
 
-<h1>Login</h1>
-<input id="loginUsername" placeholder="Username" />
-<input id="loginPassword" type="password" placeholder="Password" />
-<button onclick="login()">Login</button>
+    <div v-if="!token" class="container">
+      <div class="card">
+        <h2>Register</h2>
+        <input v-model="registerUsername" placeholder="Username">
+        <input v-model="registerPassword" type="password" placeholder="Password">
+        <button @click="register">Register</button>
+      </div>
+      <div class="card">
+        <h2>Login</h2>
+        <input v-model="loginUsername" placeholder="Username">
+        <input v-model="loginPassword" type="password" placeholder="Password">
+        <button @click="login">Login</button>
+      </div>
+    </div>
 
-<div id="message"></div>
+    <div v-else class="container">
+      <div v-if="menuOpen" class="card">
+        <button class="tab-button" @click="tab = 'home'">Home</button>
+        <button class="tab-button" @click="tab = 'blackjack'">Blackjack</button>
+        <button class="tab-button" @click="tab = 'mines'">Mines</button>
+        <button class="tab-button" @click="tab = 'profile'">Profile</button>
+        <button class="tab-button" @click="logout">Logout</button>
+      </div>
 
-<script>
-async function register() {
-  const username = document.getElementById('regUsername').value.trim();
-  const password = document.getElementById('regPassword').value.trim();
-  if (!username || !password) return showMessage('Please enter username and password.');
+      <div v-if="tab === 'home'" class="card">
+        <h2>Welcome to Ghosts Gambling</h2>
+        <div class="center">
+          <img src="https://fakecrime.bio/images/ghostpfp.png" class="profile-pic">
+          <p>Developed by Ghost</p>
+          <a href="https://fakecrime.bio/GhostUD" target="_blank">fakecrime.bio/GhostUD</a>
+        </div>
+        <h3>Online Users</h3>
+        <div class="card" v-for="u in onlineUsers" :key="u.username">
+          {{ u.username }} - {{ u.coins }} coins
+        </div>
+        <h3>Chat</h3>
+        <div class="card" v-for="msg in messages" :key="msg._id">
+          <strong @click="openProfile(msg.username)" style="cursor:pointer">{{ msg.username }}</strong>
+          <small>({{ new Date(msg.timestamp).toLocaleTimeString() }})</small><br>
+          {{ msg.text }}
+        </div>
+        <textarea v-model="chatText" placeholder="Type a message..."></textarea>
+        <button @click="sendMessage">Send</button>
+      </div>
 
-  try {
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Registration failed');
-    showMessage('Registered successfully! You can now log in.');
-  } catch (e) {
-    showMessage('Error: ' + e.message);
-  }
-}
+      <div v-if="tab === 'profile'" class="card">
+        <h2>Your Profile</h2>
+        <input type="file" @change="uploadPic">
+        <textarea v-model="bio" placeholder="Your bio..."></textarea>
+        <button @click="saveProfile">Save</button>
+        <div v-if="selectedProfile">
+          <h3>{{ selectedProfile.username }}</h3>
+          <img :src="selectedProfile.pic" class="profile-pic">
+          <p>{{ selectedProfile.bio }}</p>
+        </div>
+      </div>
 
-async function login() {
-  const username = document.getElementById('loginUsername').value.trim();
-  const password = document.getElementById('loginPassword').value.trim();
-  if (!username || !password) return showMessage('Please enter username and password.');
+      <div v-if="tab === 'blackjack'" class="card">
+        <h2>Blackjack</h2>
+        <input v-model.number="bjBet" type="number" placeholder="Bet amount">
+        <button @click="startBlackjack">Start Game</button>
+        <div v-if="bjState">
+          <p>Your Cards: {{ bjState.player.join(', ') }}</p>
+          <p>Dealer: {{ bjState.dealerShown }}</p>
+          <button @click="hitBlackjack">Hit</button>
+          <button @click="standBlackjack">Stand</button>
+        </div>
+        <p v-if="bjResult">Result: {{ bjResult }}</p>
+      </div>
 
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Login failed');
-    showMessage('Login successful! Token: ' + data.token);
-  } catch (e) {
-    showMessage('Error: ' + e.message);
-  }
-}
+      <div v-if="tab === 'mines'" class="card">
+        <h2>Mines</h2>
+        <input v-model.number="minesBet" type="number" placeholder="Bet amount">
+        <select v-model.number="minesCount">
+          <option :value="3">3 Mines</option>
+          <option :value="5">5 Mines</option>
+          <option :value="8">8 Mines</option>
+          <option :value="10">10 Mines</option>
+        </select>
+        <button @click="startMines">Start</button>
+        <div class="grid">
+          <div class="cell" v-for="(cell, i) in 25" :key="i" @click="clickCell(i)">
+            {{ revealedCells[i] }}
+          </div>
+        </div>
+        <p v-if="minesResult">{{ minesResult }}</p>
+      </div>
+    </div>
+  </div>
 
-function showMessage(msg) {
-  document.getElementById('message').textContent = msg;
-}
-</script>
+  <script>
+    const socket = io();
+    const app = Vue.createApp({
+      data() {
+        return {
+          registerUsername: '',
+          registerPassword: '',
+          loginUsername: '',
+          loginPassword: '',
+          chatText: '',
+          messages: [],
+          onlineUsers: [],
+          tab: 'home',
+          token: '',
+          menuOpen: false,
+          bio: '',
+          selectedProfile: null,
+          bjBet: 0,
+          bjState: null,
+          bjResult: '',
+          minesBet: 0,
+          minesCount: 3,
+          minesGameId: '',
+          revealedCells: [],
+          minesResult: ''
+        }
+      },
+      methods: {
+        async register() { /* backend call */ },
+        async login() { /* backend call */ },
+        async logout() { this.token = ''; },
+        async sendMessage() { /* backend call */ },
+        async openProfile(username) { /* backend call */ },
+        async saveProfile() { /* backend call */ },
+        async uploadPic(event) { /* backend call */ },
+        async startBlackjack() { /* backend call */ },
+        async hitBlackjack() { /* backend call */ },
+        async standBlackjack() { /* backend call */ },
+        async startMines() { /* backend call */ },
+        async clickCell(index) { /* backend call */ }
+      },
+      mounted() {
+        socket.on('chat', msg => this.messages.push(msg))
+        socket.on('users', users => this.onlineUsers = users)
+      }
+    }).mount('#app')
+  </script>
 </body>
 </html>
