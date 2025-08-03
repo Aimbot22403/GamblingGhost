@@ -77,6 +77,7 @@ const authenticateToken = (req, res, next) => {
 // Register
 app.post('/api/register', async (req, res) => {
     try {
+		 console.log("Register req.body:", req.body);
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ message: "Username and password are required." });
         if (password.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters." });
