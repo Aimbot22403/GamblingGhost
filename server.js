@@ -10,9 +10,7 @@ const path = require('path');
 // --- SETUP ---
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
-});
+const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
 // --- ENVIRONMENT VARIABLES & SECRETS ---
 const PORT = process.env.PORT || 3000;
@@ -30,21 +28,25 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
+
 // --- DATABASE CONNECTION ---
-if (MONGO_URI) {
-    mongoose.connect(MONGO_URI)
-        .then(() => console.log("MongoDB connected successfully."))
-        .catch(err => console.error("MongoDB connection error:", err));
-}
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("MongoDB connected"))
+  .catch(e => console.error("MongoDB connection error:", e));
 
 // --- SCHEMAS ---
 const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, required: true },
-    coins: { type: Number, default: 10000 },
-    bio: { type: String, default: "No bio set." },
-    pfp: { type: String, default: "https://i.imgur.com/8bzvETr.png" },
-    online: { type: Boolean, default: false }
+  username: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true },
+  coins: { type: Number, default: 10000 },
+  bio: { type: String, default: "No bio set." },
+  pfp: { type: String, default: "https://i.imgur.com/8bzvETr.png" },
+  online: { type: Boolean, default: false }
 });
 const messageSchema = new mongoose.Schema({
     username: String,
@@ -60,60 +62,52 @@ const minesGames = new Map();
 
 // --- AUTH MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
-    const authHeader = req.header('Authorization');
-    if (!authHeader) return res.status(401).json({ message: 'Access denied. No token provided.' });
-
-    const token = authHeader.replace('Bearer ', '');
-    try {
-        req.user = jwt.verify(token, JWT_SECRET);
-        next();
-    } catch (error) {
-        return res.status(401).json({ message: 'Invalid or expired token.' });
-    }
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'Access denied. No token provided.' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(403).json({ message: 'Invalid token' });
+  }
 };
 
 // --- API ROUTES ---
 
 // Register
 app.post('/api/register', async (req, res) => {
-    try {
-		 console.log("Register req.body:", req.body);
-        const { username, password } = req.body;
-        if (!username || !password) return res.status(400).json({ message: "Username and password are required." });
-        if (password.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters." });
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ message: "Username and password are required." });
+    if (password.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters." });
 
-        const existingUser = await User.findOne({ username: username.toLowerCase() });
-        if (existingUser) return res.status(400).json({ message: "Username already taken." });
+    const existingUser = await User.findOne({ username: username.toLowerCase() });
+    if (existingUser) return res.status(400).json({ message: "Username already taken." });
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ username: username.toLowerCase(), password: hashedPassword });
-        await user.save();
-
-        res.status(201).json({ message: "User registered successfully." });
-    } catch (error) {
-        console.error("Register error:", error);
-        res.status(500).json({ message: "Server error during registration." });
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ username: username.toLowerCase(), password: hashedPassword });
+    await user.save();
+    res.status(201).json({ message: "User registered successfully." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error during registration." });
+  }
 });
-
 // Login
 app.post('/api/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        if (!username || !password) return res.status(400).json({ message: "Username and password are required." });
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username: username.toLowerCase() });
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    const validPass = await bcrypt.compare(password, user.password);
+    if (!validPass) return res.status(401).json({ message: 'Invalid credentials' });
 
-        const user = await User.findOne({ username: username.toLowerCase() });
-        if (!user) return res.status(401).json({ message: 'Invalid credentials.' });
-
-        const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(401).json({ message: 'Invalid credentials.' });
-
-        const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
-        res.json({ token });
-    } catch (error) {
-        console.error("Login error:", error);
-        res.status(500).json({ message: "Server error during login." });
-    }
+    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ token });
+  } catch {
+    res.status(500).json({ message: "Server error during login." });
+  }
 });
 
 // Get own profile
@@ -456,6 +450,10 @@ async function broadcastOnlineUsers() {
     }
 }
 setInterval(broadcastOnlineUsers, 5000);
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/index.html'));
+});
 
 // --- SERVER START ---
 server.listen(PORT, () => {

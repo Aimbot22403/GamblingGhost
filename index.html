@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ghosts Gambling - Test</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  input, button { font-size: 16px; padding: 10px; margin: 5px 0; border-radius: 8px; border: none; }
+  input { width: 100%; max-width: 300px; }
+  button { cursor: pointer; background: #444; color: #eee; }
+  button:hover { background: #666; }
+  #message { margin-top: 10px; }
+</style>
+</head>
+<body>
+<h1>Register</h1>
+<input id="regUsername" placeholder="Username" />
+<input id="regPassword" type="password" placeholder="Password" />
+<button onclick="register()">Register</button>
+
+<h1>Login</h1>
+<input id="loginUsername" placeholder="Username" />
+<input id="loginPassword" type="password" placeholder="Password" />
+<button onclick="login()">Login</button>
+
+<div id="message"></div>
+
+<script>
+async function register() {
+  const username = document.getElementById('regUsername').value.trim();
+  const password = document.getElementById('regPassword').value.trim();
+  if (!username || !password) return showMessage('Please enter username and password.');
+
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Registration failed');
+    showMessage('Registered successfully! You can now log in.');
+  } catch (e) {
+    showMessage('Error: ' + e.message);
+  }
+}
+
+async function login() {
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!username || !password) return showMessage('Please enter username and password.');
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Login failed');
+    showMessage('Login successful! Token: ' + data.token);
+  } catch (e) {
+    showMessage('Error: ' + e.message);
+  }
+}
+
+function showMessage(msg) {
+  document.getElementById('message').textContent = msg;
+}
+</script>
+</body>
+</html>
