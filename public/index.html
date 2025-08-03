@@ -333,13 +333,13 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         let token = null, socket = null, currentUser = null;
-        const API_URL = ''; // The API is on the same domain, so this is empty.
+        const API_URL = ''; // empty api url cause uhhhhhh idk lol 
         const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
 
         const apiCall = async (endpoint, options = {}) => {
             options.headers = { ...options.headers, 'Content-Type': 'application/json', 'Accept': 'application/json' };
             if (token) options.headers['Authorization'] = `Bearer ${token}`;
-            const response = await fetch(`${API_URL}/api${endpoint}`, options); // Calls /api/login, etc.
+            const response = await fetch(`${API_URL}/api${endpoint}`, options); // calling api and shi 
             if (!response.ok) {
                 let err; try { const d = await response.json(); err = d.message || JSON.stringify(d); } catch (e) { err = await response.text(); }
                 throw new Error(err);
@@ -355,13 +355,46 @@
             $('#login-error').textContent = ''; $('#register-error').textContent = '';
         };
 
-        $('#register-btn').addEventListener('click', async () => {
-            try { const data = await apiCall('/register', { method: 'POST', body: JSON.stringify({ username: $('#register-username').value, password: $('#register-password').value }) }); alert(data.message); toggleAuthForms(); } catch (err) { $('#register-error').textContent = err.message; }
+document.querySelector('#register-btn').addEventListener('click', async () => {
+    try {
+        const data = await apiCall('/register', {
+            method: 'POST',
+            body: JSON.stringify({
+                username: document.querySelector('#register-username').value,
+                password: document.querySelector('#register-password').value
+            })
         });
-        $('#login-btn').addEventListener('click', async () => {
-            try { const data = await apiCall('/login', { method: 'POST', body: JSON.stringify({ username: $('#login-username').value, password: $('#login-password').value }) }); token = data.token; initializeApp(); } catch (err) { $('#login-error').textContent = err.message; }
+        alert(data.message);
+        toggleAuthForms();
+    } catch (err) {
+        document.querySelector('#register-error').textContent = err.message;
+    }
+});
+
+document.querySelector('#login-btn').addEventListener('click', async () => {
+    try {
+        const data = await apiCall('/login', {
+            method: 'POST',
+            body: JSON.stringify({
+                username: document.querySelector('#login-username').value,
+                password: document.querySelector('#login-password').value
+            })
         });
-        $('#logout-btn').addEventListener('click', () => { token = null; currentUser = null; if (socket) socket.disconnect(); $('#auth-modal').style.display = 'flex'; $('#app-container').style.display = 'none'; });
+        token = data.token;
+        initializeApp(); // should show #main-content and hide #auth-modal
+    } catch (err) {
+        document.querySelector('#login-error').textContent = err.message;
+    }
+});
+
+        document.querySelector('#logout-btn').addEventListener('click', () => {
+    token = null;
+    currentUser = null;
+    if (socket) socket.disconnect();
+
+    document.querySelector('#auth-modal').style.display = 'flex';
+    document.querySelector('#app-container').style.display = 'none';
+});
 
         async function initializeApp() { $('#auth-modal').style.display = 'none'; $('#app-container').style.display = 'flex'; await fetchProfile(); setupWebSocket(); setupUIEventListeners(); switchTab('home'); }
         async function fetchProfile() { try { currentUser = await apiCall('/profile'); updateUserUI(); } catch (err) { console.error("Profile fetch error:", err); } }
