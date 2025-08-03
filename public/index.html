@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ghosts Gambling</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Vercel serves the public folder, so socket.io.js is at the root -->
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
             --bg-color: #121212;
@@ -274,7 +275,7 @@
                     <div class="developer-block">
                         <a href="https://fakecrime.bio/GhostUD" target="_blank"><img src="https://i.imgur.com/8bzvETr.png" alt="Developer PFP"></a>
                         <h2>Developed by Ghost</h2>
-                        <p>A demonstration of a full-stack gambling application using Node.js, Express, and WebSockets. All balances are virtual coins with no real-world value.</p>
+                        <p>A full-stack gambling application using Node.js, Express, and WebSockets. All balances are virtual coins with no real-world value.</p>
                     </div>
                 </div>
             </div>
@@ -332,16 +333,13 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         let token = null, socket = null, currentUser = null;
-        const API_URL = ''; // The API is on the same domain
+        const API_URL = ''; // The API is on the same domain, so this is empty.
         const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
 
         const apiCall = async (endpoint, options = {}) => {
             options.headers = { ...options.headers, 'Content-Type': 'application/json', 'Accept': 'application/json' };
             if (token) options.headers['Authorization'] = `Bearer ${token}`;
-            
-            // All API calls go to the /api/ prefix, which works with our server setup
-            const response = await fetch(`${API_URL}/api${endpoint}`, options);
-
+            const response = await fetch(`${API_URL}/api${endpoint}`, options); // Calls /api/login, etc.
             if (!response.ok) {
                 let err; try { const d = await response.json(); err = d.message || JSON.stringify(d); } catch (e) { err = await response.text(); }
                 throw new Error(err);
@@ -393,7 +391,7 @@
         function switchTab(id) { $$('.tab-content').forEach(t => t.classList.remove('active')); $$('.nav-tab').forEach(b => b.classList.remove('active')); const el = $(`#${id}-tab`) || $(`#${id}`); if (el) el.classList.add('active'); const nb = $(`.nav-tab[data-tab="${id}"]`); if (nb) nb.classList.add('active'); }
         
         function loadProfileForEditing() { $('#profile-pfp-preview').src = currentUser.pfp; $('#profile-pfp-url').value = currentUser.pfp; $('#profile-bio').value = currentUser.bio; }
-        async function saveProfile() { try { const body = JSON.stringify({ bio: $('#profile-bio').value, pfp: $('#profile-pfp-url').value }); currentUser = await apiCall('/profile/update', { method: 'POST', body }); updateUserUI(); alert('Profile updated!'); switchTab('home'); } catch (err) { alert('Error: ' + err.message); } }
+        async function saveProfile() { try { await apiCall('/profile/update', { method: 'POST', body: JSON.stringify({ bio: $('#profile-bio').value, pfp: $('#profile-pfp-url').value }) }); await fetchProfile(); alert('Profile updated!'); switchTab('home'); } catch (err) { alert('Error: ' + err.message); } }
         async function showPublicProfile(u) { try { const d = await apiCall(`/user/${u}`); $('#public-profile-content').innerHTML = `<img src="${d.pfp}" alt="PFP" style="width:100px;height:100px;border-radius:50%"><h2>${d.username}</h2><p style="color:#aaa">${d.bio}</p><button onclick="document.getElementById('public-profile-modal').classList.add('hidden')">Close</button>`; $('#public-profile-modal').classList.remove('hidden'); } catch(err) { alert(err.message); } }
 
         const createCardHTML = c => { if (c.value === '?') return `<div class="card hidden"></div>`; const s = {H:'♥',D:'♦',C:'♣',S:'♠'}; const r = ['H','D'].includes(c.suit); return `<div class="card" style="color:${r?'red':'black'};"><span class="top">${c.value}${s[c.suit]}</span>${c.value}<span class="bottom">${c.value}${s[c.suit]}</span></div>`; };
