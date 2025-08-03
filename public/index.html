@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghosts Gambling</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --primary-color: #1e1e1e;
+            --secondary-color: #2a2a2a;
+            --text-color: #e0e0e0;
+            --accent-color: #ffffff;
+            --border-radius: 12px;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            --safe-color: #2a9d8f;
+            --mine-color: #e76f51;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        #app-container {
+            display: none;
+            flex-direction: row;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: var(--primary-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--secondary-color);
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 30px;
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        .chat-sidebar {
+            width: 350px;
+            background-color: var(--primary-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--secondary-color);
+            flex-shrink: 0;
+            height: 100%;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--accent-color);
+        }
+
+        .nav-menu button {
+            display: block; width: 100%; padding: 15px; margin-bottom: 10px;
+            background-color: var(--secondary-color); color: var(--text-color); border: none;
+            border-radius: var(--border-radius); text-align: left; font-size: 16px; cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+        }
+
+        .nav-menu button:hover, .nav-menu button.active {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+        }
+
+        .user-info {
+            margin-top: auto;
+            background-color: var(--secondary-color);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            position: relative;
+        }
+
+        .user-info-header { display: flex; align-items: center; justify-content: space-between; }
+        .user-details { display: flex; align-items: center; }
+        .user-info img { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; object-fit: cover; }
+        .user-info #username-display { font-weight: bold; }
+        .user-info #coins-display { font-size: 14px; color: #aaa; }
+        #menu-button { background: none; border: none; color: var(--text-color); font-size: 24px; cursor: pointer; }
+
+        .dropdown-menu {
+            display: none; position: absolute; bottom: 65px;
+            right: 15px; background-color: var(--secondary-color);
+            border-radius: var(--border-radius); box-shadow: var(--shadow);
+            overflow: hidden; z-index: 100; width: 150px;
+        }
+
+        .dropdown-menu a {
+            display: block; padding: 12px 20px; color: var(--text-color);
+            text-decoration: none; transition: background-color 0.2s;
+        }
+
+        .dropdown-menu a:hover { background-color: #444; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        h1 { margin-top: 0; border-bottom: 2px solid var(--secondary-color); padding-bottom: 15px; }
+
+        .home-container { display: flex; justify-content: center; align-items: center; text-align: center; height: 80%; }
+        .developer-block { background-color: var(--primary-color); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--shadow); max-width: 400px; }
+        .developer-block img { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--accent-color); margin-bottom: 20px; cursor: pointer; transition: transform 0.3s; }
+        .developer-block img:hover { transform: scale(1.1); }
+        .developer-block h2 { margin-top: 0; }
+        .developer-block p { color: #aaa; line-height: 1.6; }
+        .developer-block a { color: var(--accent-color); text-decoration: none; }
+
+        .chat-container { display: flex; flex-direction: column; height: 50%; }
+        .chat-sidebar h3 { margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid var(--secondary-color); }
+        #online-users-list, #chat-messages { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        #online-users-list li { display: flex; justify-content: space-between; padding: 10px; border-radius: 8px; transition: background-color 0.2s; }
+        #online-users-list li:hover { background-color: var(--secondary-color); }
+        #chat-messages { flex-grow: 1; overflow-y: auto; }
+        #chat-messages li { padding: 8px 10px; margin-bottom: 8px; word-wrap: break-word; }
+        #chat-messages .message-user { font-weight: bold; cursor: pointer; color: var(--accent-color); transition: color 0.2s; }
+        #chat-messages .message-user:hover { color: #ccc; }
+        #chat-messages .message-timestamp { font-size: 11px; color: #888; margin-left: 8px; }
+        #chat-form { display: flex; margin-top: 15px; }
+        #chat-input { flex-grow: 1; padding: 12px; background-color: var(--secondary-color); border: 1px solid #444; border-radius: var(--border-radius); color: var(--text-color); }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-overlay.hidden { display: none; }
+
+        .modal-content {
+            background-color: var(--primary-color); padding: 30px; border-radius: var(--border-radius);
+            box-shadow: var(--shadow); width: 90%; max-width: 400px; text-align: center;
+        }
+        
+        .modal-content input {
+            width: 100%; padding: 12px; margin-bottom: 15px; background-color: var(--secondary-color);
+            border: 1px solid #444; border-radius: var(--border-radius); color: var(--text-color); font-size: 16px;
+        }
+        
+        .modal-content button, .custom-button {
+            padding: 12px 20px; background-color: var(--accent-color); color: var(--bg-color);
+            border: none; border-radius: var(--border-radius); cursor: pointer; font-size: 16px;
+            font-weight: bold; transition: background-color 0.2s, opacity 0.2s;
+        }
+        .modal-content button:hover, .custom-button:hover { background-color: #e0e0e0; }
+        .custom-button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+        
+        .modal-content .switch-link { color: var(--accent-color); cursor: pointer; text-decoration: underline; margin-top: 15px; display: inline-block; }
+        .error-message { color: #ff5555; margin-bottom: 15px; min-height: 20px; text-align: left; }
+
+        #profile-page img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-color); margin-bottom: 20px; }
+        #profile-page .form-group { text-align: left; margin-bottom: 20px; }
+        #profile-page .form-group label { display: block; margin-bottom: 8px; color: #aaa; }
+        #profile-page input, #profile-page textarea {
+            width: 100%; padding: 12px; background-color: var(--secondary-color); border: 1px solid #444;
+            border-radius: var(--border-radius); color: var(--text-color);
+        }
+        #profile-page textarea { min-height: 80px; resize: vertical; }
+        
+        .game-container { background-color: var(--primary-color); padding: 25px; border-radius: var(--border-radius); box-shadow: var(--shadow); }
+        .game-controls { display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 25px; background-color: var(--secondary-color); padding: 20px; border-radius: var(--border-radius); }
+        .game-controls .form-group { display: flex; flex-direction: column; }
+        .game-controls label { font-size: 14px; color: #aaa; margin-bottom: 5px; }
+        .game-controls input, .game-controls select { padding: 10px; background-color: var(--bg-color); border: 1px solid #444; border-radius: var(--border-radius); color: var(--text-color); max-width: 150px; }
+        
+        .game-area { text-align: center; }
+        .hand-container { margin: 20px 0; min-height: 150px; }
+        .hand-container h3 { margin-bottom: 15px; }
+        .cards { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .card { width: 80px; height: 120px; background-color: var(--accent-color); color: var(--bg-color); border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; position: relative; }
+        .card.hidden { background: repeating-linear-gradient(45deg, #4a4a4a, #4a4a4a 10px, #555 10px, #555 20px); color: transparent; }
+        .card span { position: absolute; font-size: 16px; }
+        .card .top { top: 5px; left: 8px; }
+        .card .bottom { bottom: 5px; right: 8px; transform: rotate(180deg); }
+        .game-status { font-size: 1.2em; font-weight: bold; min-height: 30px; margin-top: 20px; color: var(--accent-color); }
+        #bj-actions button { margin: 0 10px; }
+
+        .mines-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 400px; margin: 20px auto; }
+        .mine-cell {
+            width: 100%; padding-bottom: 100%; background-color: var(--secondary-color);
+            border-radius: var(--border-radius); cursor: pointer; transition: background-color 0.2s; position: relative;
+        }
+        .mine-cell:not(.disabled):hover { background-color: #444; }
+        .mine-cell.safe { background-color: var(--safe-color); cursor: default; }
+        .mine-cell.mine { background-color: var(--mine-color); cursor: default; }
+        .mine-cell.disabled { pointer-events: none; opacity: 0.8; }
+        #mines-info { display: flex; justify-content: space-around; align-items: center; background: var(--secondary-color); padding: 15px; border-radius: var(--border-radius); margin-top: 20px; }
+        #mines-info div { text-align: center; }
+        #mines-info span { display: block; font-size: 14px; color: #aaa; }
+        #mines-info strong { font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+    <!-- Modals -->
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div id="login-form">
+                <h2>Login to Ghosts Gambling</h2>
+                <div class="error-message" id="login-error"></div>
+                <input type="text" id="login-username" placeholder="Username" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button id="login-btn">Login</button>
+                <p>Don't have an account? <span class="switch-link" onclick="toggleAuthForms()">Register here</span></p>
+            </div>
+            <div id="register-form" style="display: none;">
+                <h2>Register Account</h2>
+                <div class="error-message" id="register-error"></div>
+                <input type="text" id="register-username" placeholder="Username" required>
+                <input type="password" id="register-password" placeholder="Password (min 4 chars)" required>
+                <button id="register-btn">Register</button>
+                <p>Already have an account? <span class="switch-link" onclick="toggleAuthForms()">Login here</span></p>
+            </div>
+        </div>
+    </div>
+    <div id="public-profile-modal" class="modal-overlay hidden">
+        <div id="public-profile-content" class="modal-content"></div>
+    </div>
+    
+    <!-- Main Application -->
+    <div id="app-container">
+        <aside class="sidebar">
+            <div class="logo">Ghosts Gambling</div>
+            <nav class="nav-menu">
+                <button class="nav-tab active" data-tab="home">Home</button>
+                <button class="nav-tab" data-tab="blackjack">Blackjack</button>
+                <button class="nav-tab" data-tab="mines">Mines</button>
+            </nav>
+            <div class="user-info">
+                <div class="user-info-header">
+                     <div class="user-details">
+                        <img id="user-pfp-display" src="" alt="PFP">
+                        <div><div id="username-display"></div><div id="coins-display"></div></div>
+                    </div>
+                    <button id="menu-button">☰</button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu">
+                    <a href="#" id="profile-btn">Profile</a>
+                    <a href="#" id="logout-btn">Logout</a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div id="home-tab" class="tab-content active">
+                <div class="home-container">
+                    <div class="developer-block">
+                        <a href="https://fakecrime.bio/GhostUD" target="_blank"><img src="https://i.imgur.com/8bzvETr.png" alt="Developer PFP"></a>
+                        <h2>Developed by Ghost</h2>
+                        <p>A demonstration of a full-stack gambling application using Node.js, Express, and WebSockets. All balances are virtual coins with no real-world value.</p>
+                    </div>
+                </div>
+            </div>
+            <div id="profile-page" class="tab-content">
+                <h1>Edit Profile</h1>
+                <img id="profile-pfp-preview" src="" alt="Your PFP">
+                <div class="form-group"><label for="profile-pfp-url">Profile Picture URL</label><input type="text" id="profile-pfp-url"></div>
+                <div class="form-group"><label for="profile-bio">Bio</label><textarea id="profile-bio"></textarea></div>
+                <button id="save-profile-btn" class="custom-button">Save Changes</button>
+            </div>
+            <div id="blackjack-tab" class="tab-content">
+                <h1>Blackjack</h1>
+                <div class="game-container">
+                    <div id="bj-controls" class="game-controls">
+                        <div class="form-group"><label for="bj-bet-amount">Bet</label><input type="number" id="bj-bet-amount" value="100"></div>
+                        <button id="bj-start-btn" class="custom-button">Start</button>
+                    </div>
+                    <div id="blackjack-game-area" class="game-area" style="display: none;">
+                        <div class="hand-container"><h3>Dealer (<span id="dealer-score">0</span>)</h3><div class="cards" id="dealer-cards"></div></div>
+                        <div class="game-status" id="bj-status"></div>
+                        <div id="bj-actions" class="hand-container">
+                            <h3>You (<span id="player-score">0</span>)</h3>
+                            <div class="cards" id="player-cards"></div>
+                            <div style="margin-top: 20px;"><button id="bj-hit-btn" class="custom-button">Hit</button><button id="bj-stand-btn" class="custom-button">Stand</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="mines-tab" class="tab-content">
+                <h1>Mines</h1>
+                <div class="game-container">
+                    <div class="game-controls">
+                        <div class="form-group"><label for="mines-bet-amount">Bet</label><input type="number" id="mines-bet-amount" value="100"></div>
+                        <div class="form-group"><label for="mines-count">Mines</label><select id="mines-count" class="game-controls input"><option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="10">10</option></select></div>
+                        <button id="mines-start-btn" class="custom-button">Start</button>
+                    </div>
+                     <div id="mines-game-area" style="display: none;">
+                        <div class="mines-grid" id="mines-grid"></div>
+                        <div id="mines-info">
+                            <div><span>Profit</span><strong id="mines-profit">0</strong></div>
+                            <div><span>Next Tile</span><strong id="mines-next-profit">0</strong></div>
+                            <button id="mines-cashout-btn" class="custom-button" disabled>Cashout</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <aside class="chat-sidebar">
+            <div class="chat-container"><h3>Online</h3><ul id="online-users-list"></ul></div>
+            <div class="chat-container"><h3>Chat</h3><ul id="chat-messages"></ul><form id="chat-form"><input id="chat-input" autocomplete="off" placeholder="Say something..." /></form></div>
+        </aside>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        let token = null, socket = null, currentUser = null;
+        const API_URL = ''; // The API is on the same domain
+        const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
+
+        const apiCall = async (endpoint, options = {}) => {
+            options.headers = { ...options.headers, 'Content-Type': 'application/json', 'Accept': 'application/json' };
+            if (token) options.headers['Authorization'] = `Bearer ${token}`;
+            
+            // All API calls go to the /api/ prefix, which works with our server setup
+            const response = await fetch(`${API_URL}/api${endpoint}`, options);
+
+            if (!response.ok) {
+                let err; try { const d = await response.json(); err = d.message || JSON.stringify(d); } catch (e) { err = await response.text(); }
+                throw new Error(err);
+            }
+            if (response.status === 201) return response.json();
+            if (response.headers.get("content-length") === "0") return null;
+            return response.json();
+        };
+
+        window.toggleAuthForms = () => {
+            $('#login-form').style.display = $('#login-form').style.display === 'none' ? 'block' : 'none';
+            $('#register-form').style.display = $('#register-form').style.display === 'none' ? 'block' : 'none';
+            $('#login-error').textContent = ''; $('#register-error').textContent = '';
+        };
+
+        $('#register-btn').addEventListener('click', async () => {
+            try { const data = await apiCall('/register', { method: 'POST', body: JSON.stringify({ username: $('#register-username').value, password: $('#register-password').value }) }); alert(data.message); toggleAuthForms(); } catch (err) { $('#register-error').textContent = err.message; }
+        });
+        $('#login-btn').addEventListener('click', async () => {
+            try { const data = await apiCall('/login', { method: 'POST', body: JSON.stringify({ username: $('#login-username').value, password: $('#login-password').value }) }); token = data.token; initializeApp(); } catch (err) { $('#login-error').textContent = err.message; }
+        });
+        $('#logout-btn').addEventListener('click', () => { token = null; currentUser = null; if (socket) socket.disconnect(); $('#auth-modal').style.display = 'flex'; $('#app-container').style.display = 'none'; });
+
+        async function initializeApp() { $('#auth-modal').style.display = 'none'; $('#app-container').style.display = 'flex'; await fetchProfile(); setupWebSocket(); setupUIEventListeners(); switchTab('home'); }
+        async function fetchProfile() { try { currentUser = await apiCall('/profile'); updateUserUI(); } catch (err) { console.error("Profile fetch error:", err); } }
+        function updateUserUI() { if (!currentUser) return; $('#username-display').textContent = currentUser.username; $('#coins-display').textContent = `${currentUser.coins.toLocaleString()} coins`; $('#user-pfp-display').src = currentUser.pfp; }
+        
+        function setupWebSocket() {
+            if (socket) socket.disconnect();
+            socket = io({ auth: { token } });
+            socket.on('connect', () => socket.emit('authenticate', token));
+            socket.on('online_users', users => { let l = ''; users.sort((a,b) => b.coins - a.coins).forEach(u => l += `<li><span>${u.username}</span> <span>${u.coins.toLocaleString()}</span></li>`); $('#online-users-list').innerHTML = l; });
+            socket.on('chat_history', msgs => { $('#chat-messages').innerHTML = ''; msgs.forEach(addChatMessage); });
+            socket.on('chat_message', addChatMessage);
+            $('#chat-form').addEventListener('submit', e => { e.preventDefault(); if ($('#chat-input').value) { socket.emit('chat_message', $('#chat-input').value); $('#chat-input').value = ''; } });
+        }
+        function addChatMessage(msg) { const cb = $('#chat-messages'); cb.innerHTML += `<li><div><span class="message-user" data-username="${msg.username}">${msg.username}</span><span class="message-timestamp">${new Date(msg.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div><div>${msg.message}</div></li>`; cb.scrollTop = cb.scrollHeight; }
+
+        function setupUIEventListeners() {
+            $$('.nav-tab').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+            $('#menu-button').addEventListener('click', () => { $('#dropdown-menu').style.display = $('#dropdown-menu').style.display === 'block' ? 'none' : 'block'; });
+            document.addEventListener('click', e => { if (!$('#menu-button').contains(e.target) && !$('#dropdown-menu').contains(e.target)) $('#dropdown-menu').style.display = 'none'; });
+            $('#profile-btn').addEventListener('click', e => { e.preventDefault(); switchTab('profile-page'); loadProfileForEditing(); $('#dropdown-menu').style.display = 'none'; });
+            $('#save-profile-btn').addEventListener('click', saveProfile);
+            $('#chat-messages').addEventListener('click', e => { if (e.target.classList.contains('message-user')) showPublicProfile(e.target.dataset.username); });
+            $('#public-profile-modal').addEventListener('click', e => { if (e.target.id === 'public-profile-modal') e.target.classList.add('hidden'); });
+            setupBlackjackListeners(); setupMinesListeners();
+        }
+        function switchTab(id) { $$('.tab-content').forEach(t => t.classList.remove('active')); $$('.nav-tab').forEach(b => b.classList.remove('active')); const el = $(`#${id}-tab`) || $(`#${id}`); if (el) el.classList.add('active'); const nb = $(`.nav-tab[data-tab="${id}"]`); if (nb) nb.classList.add('active'); }
+        
+        function loadProfileForEditing() { $('#profile-pfp-preview').src = currentUser.pfp; $('#profile-pfp-url').value = currentUser.pfp; $('#profile-bio').value = currentUser.bio; }
+        async function saveProfile() { try { const body = JSON.stringify({ bio: $('#profile-bio').value, pfp: $('#profile-pfp-url').value }); currentUser = await apiCall('/profile/update', { method: 'POST', body }); updateUserUI(); alert('Profile updated!'); switchTab('home'); } catch (err) { alert('Error: ' + err.message); } }
+        async function showPublicProfile(u) { try { const d = await apiCall(`/user/${u}`); $('#public-profile-content').innerHTML = `<img src="${d.pfp}" alt="PFP" style="width:100px;height:100px;border-radius:50%"><h2>${d.username}</h2><p style="color:#aaa">${d.bio}</p><button onclick="document.getElementById('public-profile-modal').classList.add('hidden')">Close</button>`; $('#public-profile-modal').classList.remove('hidden'); } catch(err) { alert(err.message); } }
+
+        const createCardHTML = c => { if (c.value === '?') return `<div class="card hidden"></div>`; const s = {H:'♥',D:'♦',C:'♣',S:'♠'}; const r = ['H','D'].includes(c.suit); return `<div class="card" style="color:${r?'red':'black'};"><span class="top">${c.value}${s[c.suit]}</span>${c.value}<span class="bottom">${c.value}${s[c.suit]}</span></div>`; };
+        function updateBlackjackUI(g) { $('#player-cards').innerHTML = g.playerHand.map(createCardHTML).join(''); $('#dealer-cards').innerHTML = g.dealerHand.map(createCardHTML).join(''); $('#player-score').textContent = g.playerValue; $('#dealer-score').textContent = g.dealerValue || '?'; $('#bj-status').textContent = g.status; if (typeof g.newBalance !== 'undefined') { currentUser.coins = g.newBalance; updateUserUI(); } const p = g.status === 'playing'; $('#bj-hit-btn').style.display = p?'inline-block':'none'; $('#bj-stand-btn').style.display = p?'inline-block':'none'; $('#bj-start-btn').disabled = p; }
+        function setupBlackjackListeners() {
+            $('#bj-start-btn').addEventListener('click', async () => { try { $('#blackjack-game-area').style.display = 'block'; const g = await apiCall('/blackjack/start', { method: 'POST', body: JSON.stringify({ bet: parseInt($('#bj-bet-amount').value) }) }); updateBlackjackUI(g); } catch(err) { alert('Error: ' + err.message); } });
+            const doAction = async (a) => { try { $('#bj-hit-btn').disabled = true; $('#bj-stand-btn').disabled = true; const g = await apiCall('/blackjack/action', { method: 'POST', body: JSON.stringify({ action: a }) }); updateBlackjackUI(g); $('#bj-hit-btn').disabled = false; $('#bj-stand-btn').disabled = false; } catch(err) { alert('Error: ' + err.message); } };
+            $('#bj-hit-btn').addEventListener('click', () => doAction('hit')); $('#bj-stand-btn').addEventListener('click', () => doAction('stand'));
+        }
+
+        function setupMinesListeners() { $('#mines-start-btn').addEventListener('click', startMines); $('#mines-cashout-btn').addEventListener('click', cashoutMines); }
+        async function startMines() { try { const bet = parseInt($('#mines-bet-amount').value), minesCount = parseInt($('#mines-count').value); const data = await apiCall('/mines/start', { method: 'POST', body: JSON.stringify({ bet, minesCount }) }); currentUser.coins = data.newBalance; updateUserUI(); renderMinesGrid(); $('#mines-game-area').style.display = 'block'; $('#mines-start-btn').disabled = true; $('#mines-cashout-btn').disabled = true; $('#mines-profit').textContent = '0'; const mult = {3:1.15,5:1.3,8:1.5,10:1.8}[minesCount]; $('#mines-next-profit').textContent = `${Math.floor(bet*mult-bet)}`; } catch(err) { alert('Error: ' + err.message); } }
+        function renderMinesGrid() { let g = $('#mines-grid'); g.innerHTML = ''; for (let i = 0; i < 25; i++) { const c = document.createElement('div'); c.className = 'mine-cell'; c.dataset.index = i; c.addEventListener('click', handleMineClick); g.appendChild(c); } }
+        async function handleMineClick(e) {
+            const cell = e.target; if (cell.classList.contains('disabled')) return; cell.classList.add('disabled');
+            try {
+                const data = await apiCall('/mines/click', { method: 'POST', body: JSON.stringify({ index: parseInt(cell.dataset.index) }) });
+                if (data.gameOver) { alert(data.message); data.minePositions.forEach(p => $(`.mine-cell[data-index='${p}']`).classList.add('mine')); $$('.mine-cell').forEach(c => c.classList.add('disabled')); resetMinesGame(false); }
+                else { cell.classList.remove('disabled'); cell.classList.add('safe', 'disabled'); $('#mines-cashout-btn').disabled = false; $('#mines-profit').textContent = data.profit; const bet = parseInt($('#mines-bet-amount').value); $('#mines-next-profit').textContent = `${Math.floor(bet*data.nextMultiplier-bet)}`; }
+            } catch(err) { alert('Error: ' + err.message); resetMinesGame(true); }
+        }
+        async function cashoutMines() { try { const data = await apiCall('/mines/cashout', { method: 'POST' }); alert(data.message); currentUser.coins = data.newBalance; updateUserUI(); resetMinesGame(true); } catch(err) { alert('Error: ' + err.message); } }
+        function resetMinesGame(hide) { $('#mines-start-btn').disabled = false; $('#mines-cashout-btn').disabled = true; if (hide) $('#mines-game-area').style.display = 'none'; }
+    });
+    </script>
+</body>
+</html>
